@@ -21,9 +21,107 @@ import {
   Printer,
   Trash2,
   Plus,
+  Gauge,
 } from "lucide-react";
 import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
 import { toast } from "sonner";
+import type { Highlight, Requirement } from "@/lib/analyzer";
+
+const CATEGORY_STYLE: Record<Highlight["category"], string> = {
+  ambiguous: "bg-warning/25 text-warning-foreground underline decoration-warning decoration-wavy",
+  missing: "bg-primary/15 text-primary underline decoration-primary decoration-dotted",
+  risk: "bg-destructive/15 text-destructive underline decoration-destructive decoration-wavy",
+};
+
+function HighlightedText({ req }: { req: Requirement }) {
+  const text = req.rawText;
+  const highlights = req.analysis.highlights ?? [];
+
+  // Build a sorted, non-overlapping span list.
+  type Span = { start: number; end: number; h: Highlight };
+  const spans: Span[] = [];
+  const lower = text.toLowerCase();
+  for (const h of highlights) {
+    if (!h.text) continue;
+    const needle = h.text.toLowerCase();
+    let from = 0;
+    while (true) {
+      const idx = lower.indexOf(needle, from);
+      if (idx === -1) break;
+      spans.push({ start: idx, end: idx + h.text.length, h });
+      from = idx + h.text.length;
+      break; // only first occurrence per highlight
+    }
+  }
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const merged: Span[] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s.start < last.end) continue;
+    merged.push(s);
+  }
+
+  if (!merged.length) {
+    return (
+      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed bg-muted/40 p-4 rounded-lg border border-border">
+        {text}
+      </p>
+    );
+  }
+
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  merged.forEach((s, i) => {
+    if (s.start > cursor) parts.push(<span key={`t-${i}`}>{text.slice(cursor, s.start)}</span>);
+    parts.push(
+      <span
+        key={`h-${i}`}
+        title={`${s.h.category.toUpperCase()}: ${s.h.note}`}
+        className={`rounded px-0.5 ${CATEGORY_STYLE[s.h.category]}`}
+      >
+        {text.slice(s.start, s.end)}
+      </span>
+    );
+    cursor = s.end;
+  });
+  if (cursor < text.length) parts.push(<span key="tail">{text.slice(cursor)}</span>);
+
+  return (
+    <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed bg-muted/40 p-4 rounded-lg border border-border">
+      {parts}
+    </div>
+  );
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  const tone = value >= 75 ? "text-success" : value >= 50 ? "text-warning" : "text-destructive";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={`font-semibold ${tone}`}>{value}</span>
+      </div>
+      <Progress value={value} className="h-1.5" />
+    </div>
+  );
+}
+
+function MissingBlock({ title, items }: { title: string; items: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{title}</p>
+      <ul className="space-y-1.5">
+        {items.map((x, i) => (
+          <li key={i} className="text-sm text-foreground flex gap-2">
+            <span className="text-primary shrink-0">•</span>
+            <span>{x}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function Artifacts() {
   const [params, setParams] = useSearchParams();
@@ -106,19 +204,67 @@ export default function Artifacts() {
                   Analyzed {new Date(req.createdAt).toLocaleString()}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <Badge variant="secondary"><FileText className="h-3 w-3 mr-1" />{a.userStories.length} stories</Badge>
-                  <Badge variant="secondary"><ShieldAlert className="h-3 w-3 mr-1" />{a.risks.length} risks</Badge>
-                  <Badge variant="secondary"><Users className="h-3 w-3 mr-1" />{a.stakeholders.length} stakeholders</Badge>
+                  <Badge variant="secondary">
+                    <FileText className="h-3 w-3 mr-1" />
+                    {a.userStories.length} stories
+                  </Badge>
+                  <Badge variant="secondary">
+                    <ShieldAlert className="h-3 w-3 mr-1" />
+                    {a.risks.length} risks
+                  </Badge>
+                  <Badge variant="secondary">
+                    <Users className="h-3 w-3 mr-1" />
+                    {a.stakeholders.length} stakeholders
+                  </Badge>
+                  <Badge variant="secondary">
+                    <Gauge className="h-3 w-3 mr-1" />
+                    Confidence {a.confidence}%
+                  </Badge>
                 </div>
               </div>
               <div className="flex flex-col items-center justify-center min-w-[140px] p-4 rounded-xl bg-gradient-subtle border border-border">
                 <p className={`text-4xl font-bold ${scoreTone}`}>{a.qualityScore}</p>
                 <p className="text-xs text-muted-foreground">Quality Score</p>
-                <Badge variant="outline" className={`mt-2 ${scoreTone} border-current`}>{scoreLabel}</Badge>
+                <Badge variant="outline" className={`mt-2 ${scoreTone} border-current`}>
+                  {scoreLabel}
+                </Badge>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Score breakdown + highlighted text */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="shadow-soft border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Gauge className="h-4 w-4 text-primary" /> Quality Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              <ScoreBar label="Clarity" value={a.scoreBreakdown.clarity} />
+              <ScoreBar label="Completeness" value={a.scoreBreakdown.completeness} />
+              <ScoreBar label="Consistency" value={a.scoreBreakdown.consistency} />
+              <ScoreBar label="Testability" value={a.scoreBreakdown.testability} />
+              <ScoreBar label="Business Context" value={a.scoreBreakdown.businessContext} />
+              <ScoreBar label="Functional Detail" value={a.scoreBreakdown.missingFunctionalDetails} />
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-soft border-border/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Highlighted Requirement</CardTitle>
+              <div className="flex flex-wrap gap-2 pt-1 text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-warning/25 text-warning-foreground">ambiguous</span>
+                <span className="px-2 py-0.5 rounded bg-primary/15 text-primary">missing</span>
+                <span className="px-2 py-0.5 rounded bg-destructive/15 text-destructive">risk</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <HighlightedText req={req} />
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Export Panel */}
         <Card className="shadow-soft border-border/60">
@@ -128,13 +274,34 @@ export default function Artifacts() {
               <span className="text-sm font-medium">Export this analysis</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => { exportPDF(req); toast.success("PDF print dialog opened"); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  exportPDF(req);
+                  toast.success("PDF print dialog opened");
+                }}
+              >
                 <Printer className="h-4 w-4 mr-2" /> PDF
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { exportDOCX(req); toast.success("DOCX downloaded"); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  exportDOCX(req);
+                  toast.success("DOCX downloaded");
+                }}
+              >
                 <FileType2 className="h-4 w-4 mr-2" /> DOCX
               </Button>
-              <Button size="sm" variant="outline" onClick={() => { exportCSV(req); toast.success("CSV downloaded"); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  exportCSV(req);
+                  toast.success("CSV downloaded");
+                }}
+              >
                 <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV
               </Button>
               <Button
@@ -176,7 +343,9 @@ export default function Artifacts() {
                       {a.ambiguities.map((x, i) => (
                         <li key={i} className="text-sm text-foreground flex gap-2">
                           <span className="text-warning shrink-0">•</span>
-                          <span>{x}</span>
+                          <span>
+                            <span className="font-semibold bg-warning/20 px-1 rounded">"{x.term}"</span> — {x.reason}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -191,18 +360,24 @@ export default function Artifacts() {
               <Card className="shadow-soft border-border/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm flex items-center gap-2">
-                    <HelpCircle className="h-4 w-4 text-primary" /> Missing Information ({a.missingInfo.length})
+                    <HelpCircle className="h-4 w-4 text-primary" /> Missing Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {a.missingInfo.map((x, i) => (
-                      <li key={i} className="text-sm text-foreground flex gap-2">
-                        <span className="text-primary shrink-0">•</span>
-                        <span>{x}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <CardContent className="space-y-4">
+                  <MissingBlock title="Missing Actors" items={a.missingActors} />
+                  <MissingBlock title="Missing Business Rules" items={a.missingBusinessRules} />
+                  <MissingBlock title="Missing Validations" items={a.missingValidations} />
+                  <MissingBlock title="Missing Workflows" items={a.missingWorkflows} />
+                  <MissingBlock title="Missing Exception Scenarios" items={a.missingExceptionScenarios} />
+                  <MissingBlock
+                    title="Missing Non-Functional Requirements"
+                    items={a.missingNonFunctionalRequirements}
+                  />
+                  {!a.missingInfo.length && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-success" /> Nothing critical missing
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -215,7 +390,9 @@ export default function Artifacts() {
                 <CardContent>
                   <ol className="space-y-2 list-decimal list-inside">
                     {a.clarificationQuestions.map((x, i) => (
-                      <li key={i} className="text-sm text-foreground">{x}</li>
+                      <li key={i} className="text-sm text-foreground">
+                        {x}
+                      </li>
                     ))}
                   </ol>
                 </CardContent>
@@ -247,20 +424,11 @@ export default function Artifacts() {
               <CardContent>
                 <ul className="space-y-1.5">
                   {a.assumptions.map((x, i) => (
-                    <li key={i} className="text-sm text-muted-foreground">— {x}</li>
+                    <li key={i} className="text-sm text-muted-foreground">
+                      — {x}
+                    </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft border-border/60">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Original Requirement</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed bg-muted/40 p-4 rounded-lg border border-border">
-                  {req.rawText}
-                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -271,14 +439,22 @@ export default function Artifacts() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-3">
                     <CardTitle className="text-sm">User Story #{i + 1}</CardTitle>
-                    <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority} priority</Badge>
+                    <Badge variant="outline" className={priorityColor[s.priority]}>
+                      {s.priority} priority
+                    </Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
-                    <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
-                    <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
-                    <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
+                    <p>
+                      <span className="font-semibold text-primary">As a</span> {s.asA},
+                    </p>
+                    <p>
+                      <span className="font-semibold text-primary">I want</span> {s.iWant},
+                    </p>
+                    <p>
+                      <span className="font-semibold text-primary">so that</span> {s.soThat}.
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -317,8 +493,12 @@ export default function Artifacts() {
                       <TableRow key={i}>
                         <TableCell className="font-medium">{s.name}</TableCell>
                         <TableCell className="text-muted-foreground">{s.role}</TableCell>
-                        <TableCell><Badge variant="outline">{s.interest}</Badge></TableCell>
-                        <TableCell><Badge variant="outline">{s.influence}</Badge></TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{s.interest}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{s.influence}</Badge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

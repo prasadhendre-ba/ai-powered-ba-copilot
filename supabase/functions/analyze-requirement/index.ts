@@ -267,8 +267,49 @@ const analysisTool = {
             endStates: { type: "array", items: { type: "string" } },
             textFlow: { type: "array", items: { type: "string" } },
             mermaid: { type: "string", description: "Raw mermaid 'flowchart TD' source, no code fences." },
+            activityDiagram: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                startNode: { type: "string" },
+                endNodes: { type: "array", items: { type: "string" } },
+                activities: { type: "array", items: { type: "string" } },
+                decisions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      question: { type: "string" },
+                      yesPath: { type: "string" },
+                      noPath: { type: "string" },
+                    },
+                    required: ["question", "yesPath", "noPath"],
+                  },
+                },
+                alternatePaths: { type: "array", items: { type: "string" } },
+                exceptionPaths: { type: "array", items: { type: "string" } },
+                actorActions: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    properties: {
+                      actor: { type: "string" },
+                      action: { type: "string" },
+                    },
+                    required: ["actor", "action"],
+                  },
+                },
+                systemActions: { type: "array", items: { type: "string" } },
+                integrationPoints: { type: "array", items: { type: "string" } },
+                textActivityFlow: { type: "array", items: { type: "string" } },
+                mermaid: { type: "string", description: "Raw mermaid source for the UML Activity Diagram, no code fences. Must start with 'flowchart TD'." },
+              },
+              required: ["startNode","endNodes","activities","decisions","alternatePaths","exceptionPaths","actorActions","systemActions","integrationPoints","textActivityFlow","mermaid"],
+            },
           },
-          required: ["actors","activities","decisionPoints","systemActions","integrations","endStates","textFlow","mermaid"],
+          required: ["actors","activities","decisionPoints","systemActions","integrations","endStates","textFlow","mermaid","activityDiagram"],
         },
       },
       required: [

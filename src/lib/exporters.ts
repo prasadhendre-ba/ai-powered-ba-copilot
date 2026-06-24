@@ -16,7 +16,7 @@ export function exportCSV(req: Requirement) {
   rows.push(["Requirement", "Title", req.title]);
   rows.push(["Requirement", "Quality Score", String(req.analysis.qualityScore)]);
   rows.push(["Requirement", "Raw Text", req.rawText]);
-  req.analysis.ambiguities.forEach((a, i) => rows.push(["Ambiguity", `#${i + 1}`, a]));
+  req.analysis.ambiguities.forEach((a, i) => rows.push(["Ambiguity", `#${i + 1}`, `${a.term} — ${a.reason}`]));
   req.analysis.missingInfo.forEach((a, i) => rows.push(["Missing Info", `#${i + 1}`, a]));
   req.analysis.userStories.forEach((s, i) => {
     rows.push(["User Story", `#${i + 1} As a`, s.asA]);

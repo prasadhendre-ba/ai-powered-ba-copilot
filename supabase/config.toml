@@ -1,0 +1,4 @@
+project_id = "uahgicxzqvitzswwcurr"
+
+[functions.analyze-requirement]
+verify_jwt = false

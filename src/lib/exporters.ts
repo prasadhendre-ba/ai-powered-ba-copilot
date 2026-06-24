@@ -1,5 +1,9 @@
 import { type Requirement } from "./analyzer";
 
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+}
+
 function downloadBlob(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -16,7 +20,7 @@ export function exportCSV(req: Requirement) {
   rows.push(["Requirement", "Title", req.title]);
   rows.push(["Requirement", "Quality Score", String(req.analysis.qualityScore)]);
   rows.push(["Requirement", "Raw Text", req.rawText]);
-  req.analysis.ambiguities.forEach((a, i) => rows.push(["Ambiguity", `#${i + 1}`, a]));
+  req.analysis.ambiguities.forEach((a, i) => rows.push(["Ambiguity", `#${i + 1}`, `${a.term} — ${a.reason}`]));
   req.analysis.missingInfo.forEach((a, i) => rows.push(["Missing Info", `#${i + 1}`, a]));
   req.analysis.userStories.forEach((s, i) => {
     rows.push(["User Story", `#${i + 1} As a`, s.asA]);
@@ -63,7 +67,7 @@ function renderHTML(req: Requirement) {
 <p>${req.rawText}</p>
 
 <h2>Ambiguities</h2>
-<ul>${a.ambiguities.map((x) => `<li>${x}</li>`).join("") || "<li>None detected</li>"}</ul>
+<ul>${a.ambiguities.map((x) => `<li><strong>"${escapeHtml(x.term)}"</strong> — ${escapeHtml(x.reason)}</li>`).join("") || "<li>None detected</li>"}</ul>
 
 <h2>Missing Information</h2>
 <ul>${a.missingInfo.map((x) => `<li>${x}</li>`).join("") || "<li>None detected</li>"}</ul>

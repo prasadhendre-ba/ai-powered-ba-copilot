@@ -1,6 +1,5 @@
 // Type definitions for AI-generated BA analysis.
-// The actual analysis is produced by the analyze-requirement edge function;
-// this module is types-only plus tiny helpers.
+// The actual analysis is produced by the analyze-requirement edge function.
 
 export interface Requirement {
   id: string;
@@ -11,12 +10,28 @@ export interface Requirement {
 }
 
 export interface ScoreBreakdown {
-  clarity: number;
-  completeness: number;
-  consistency: number;
+  businessObjective: number;
+  actorsStakeholders: number;
+  functionalRequirements: number;
+  businessRules: number;
+  validations: number;
+  workflowCoverage: number;
+  exceptionHandling: number;
+  integrations: number;
+  nonFunctionalRequirements: number;
   testability: number;
-  businessContext: number;
-  missingFunctionalDetails: number;
+}
+
+export interface ScoreDeduction {
+  dimension: string;
+  points: number;
+  reason: string;
+}
+
+export interface ScoreRationale {
+  strengths: string[];
+  weaknesses: string[];
+  deductions: ScoreDeduction[];
 }
 
 export interface Ambiguity {
@@ -30,13 +45,23 @@ export interface Highlight {
   note: string;
 }
 
+export interface AcceptanceCriteria {
+  happyPath: string;
+  validation: string;
+  exception: string;
+}
+
 export interface UserStory {
   id: string;
+  storyId: string;
+  title: string;
+  priority: "High" | "Medium" | "Low";
+  businessValue: string;
+  complexityPoints: number;
   asA: string;
   iWant: string;
   soThat: string;
-  acceptanceCriteria: string[]; // Gherkin
-  priority: "High" | "Medium" | "Low";
+  acceptanceCriteria: AcceptanceCriteria;
 }
 
 export interface Stakeholder {
@@ -58,6 +83,7 @@ export interface Analysis {
   qualityScore: number;
   confidence: number;
   scoreBreakdown: ScoreBreakdown;
+  scoreRationale: ScoreRationale;
   ambiguities: Ambiguity[];
   missingActors: string[];
   missingBusinessRules: string[];
@@ -65,7 +91,6 @@ export interface Analysis {
   missingWorkflows: string[];
   missingExceptionScenarios: string[];
   missingNonFunctionalRequirements: string[];
-  /** Flattened convenience list of all "missing" findings — used by dashboard/exporters. */
   missingInfo: string[];
   clarificationQuestions: string[];
   improvementSuggestions: string[];
@@ -81,6 +106,7 @@ export interface RawAiAnalysis {
   qualityScore: number;
   confidence: number;
   scoreBreakdown: ScoreBreakdown;
+  scoreRationale: ScoreRationale;
   ambiguities: Ambiguity[];
   missingActors: string[];
   missingBusinessRules: string[];
@@ -97,23 +123,52 @@ export interface RawAiAnalysis {
   highlights: Highlight[];
 }
 
+export const SCORE_DIMENSIONS: { key: keyof ScoreBreakdown; label: string }[] = [
+  { key: "businessObjective", label: "Business Objective" },
+  { key: "actorsStakeholders", label: "Actors & Stakeholders" },
+  { key: "functionalRequirements", label: "Functional Requirements" },
+  { key: "businessRules", label: "Business Rules" },
+  { key: "validations", label: "Validations" },
+  { key: "workflowCoverage", label: "Workflow Coverage" },
+  { key: "exceptionHandling", label: "Exception Handling" },
+  { key: "integrations", label: "Integrations" },
+  { key: "nonFunctionalRequirements", label: "Non-Functional Requirements" },
+  { key: "testability", label: "Testability" },
+];
+
 export function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function clamp(n: number, min = 0, max = 100) {
+  if (typeof n !== "number" || Number.isNaN(n)) return 0;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+
 export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
-  const labeled = (label: string, items: string[] = []) =>
-    items.map((i) => `${label}: ${i}`);
+  const labeled = (label: string, items: string[] = []) => items.map((i) => `${label}: ${i}`);
+  const sb = raw.scoreBreakdown ?? ({} as ScoreBreakdown);
+  const breakdown: ScoreBreakdown = {
+    businessObjective: clamp(sb.businessObjective ?? 0, 0, 10),
+    actorsStakeholders: clamp(sb.actorsStakeholders ?? 0, 0, 10),
+    functionalRequirements: clamp(sb.functionalRequirements ?? 0, 0, 10),
+    businessRules: clamp(sb.businessRules ?? 0, 0, 10),
+    validations: clamp(sb.validations ?? 0, 0, 10),
+    workflowCoverage: clamp(sb.workflowCoverage ?? 0, 0, 10),
+    exceptionHandling: clamp(sb.exceptionHandling ?? 0, 0, 10),
+    integrations: clamp(sb.integrations ?? 0, 0, 10),
+    nonFunctionalRequirements: clamp(sb.nonFunctionalRequirements ?? 0, 0, 10),
+    testability: clamp(sb.testability ?? 0, 0, 10),
+  };
+  const sum = Object.values(breakdown).reduce((a, n) => a + n, 0);
   return {
-    qualityScore: clamp(raw.qualityScore),
+    qualityScore: clamp(raw.qualityScore ?? sum),
     confidence: clamp(raw.confidence),
-    scoreBreakdown: {
-      clarity: clamp(raw.scoreBreakdown?.clarity ?? 0),
-      completeness: clamp(raw.scoreBreakdown?.completeness ?? 0),
-      consistency: clamp(raw.scoreBreakdown?.consistency ?? 0),
-      testability: clamp(raw.scoreBreakdown?.testability ?? 0),
-      businessContext: clamp(raw.scoreBreakdown?.businessContext ?? 0),
-      missingFunctionalDetails: clamp(raw.scoreBreakdown?.missingFunctionalDetails ?? 0),
+    scoreBreakdown: breakdown,
+    scoreRationale: {
+      strengths: raw.scoreRationale?.strengths ?? [],
+      weaknesses: raw.scoreRationale?.weaknesses ?? [],
+      deductions: raw.scoreRationale?.deductions ?? [],
     },
     ambiguities: raw.ambiguities ?? [],
     missingActors: raw.missingActors ?? [],
@@ -138,9 +193,4 @@ export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
     assumptions: raw.assumptions ?? [],
     highlights: raw.highlights ?? [],
   };
-}
-
-function clamp(n: number, min = 0, max = 100) {
-  if (typeof n !== "number" || Number.isNaN(n)) return 0;
-  return Math.max(min, Math.min(max, Math.round(n)));
 }

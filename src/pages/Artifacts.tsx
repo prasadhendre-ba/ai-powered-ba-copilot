@@ -1,0 +1,375 @@
+import { useMemo, useState } from "react";
+import { useSearchParams, Link } from "react-router-dom";
+import { useStore } from "@/lib/store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertTriangle,
+  HelpCircle,
+  Lightbulb,
+  FileText,
+  Users,
+  ShieldAlert,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  FileType2,
+  Printer,
+  Trash2,
+  Plus,
+} from "lucide-react";
+import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
+import { toast } from "sonner";
+
+export default function Artifacts() {
+  const [params, setParams] = useSearchParams();
+  const requirements = useStore((s) => s.requirements);
+  const deleteRequirement = useStore((s) => s.deleteRequirement);
+  const selectedId = params.get("id") ?? requirements[0]?.id;
+  const req = useMemo(() => requirements.find((r) => r.id === selectedId), [requirements, selectedId]);
+  const [tab, setTab] = useState("analysis");
+
+  if (!req) {
+    return (
+      <Card className="max-w-md mx-auto mt-12 shadow-soft">
+        <CardContent className="p-8 text-center space-y-4">
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
+          <p className="text-muted-foreground">No requirements yet. Analyze your first one.</p>
+          <Button asChild className="bg-gradient-primary">
+            <Link to="/analyzer">
+              <Plus className="h-4 w-4 mr-2" /> New Analysis
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const a = req.analysis;
+  const scoreTone =
+    a.qualityScore >= 80 ? "text-success" : a.qualityScore >= 60 ? "text-warning" : "text-destructive";
+  const scoreLabel =
+    a.qualityScore >= 80 ? "Excellent" : a.qualityScore >= 60 ? "Good" : a.qualityScore >= 40 ? "Needs Work" : "Poor";
+  const priorityColor: Record<string, string> = {
+    High: "bg-destructive/10 text-destructive border-destructive/20",
+    Medium: "bg-warning/10 text-warning border-warning/20",
+    Low: "bg-muted text-muted-foreground border-border",
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+      {/* Sidebar list */}
+      <aside className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">All Requirements</h3>
+          <Badge variant="secondary">{requirements.length}</Badge>
+        </div>
+        <Button asChild size="sm" variant="outline" className="w-full">
+          <Link to="/analyzer">
+            <Plus className="h-4 w-4 mr-2" /> New
+          </Link>
+        </Button>
+        <div className="space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+          {requirements.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setParams({ id: r.id })}
+              className={`w-full text-left p-3 rounded-lg border transition-all ${
+                r.id === selectedId
+                  ? "border-primary bg-accent shadow-soft"
+                  : "border-border hover:border-primary/40 bg-card"
+              }`}
+            >
+              <p className="text-sm font-medium text-foreground truncate">{r.title}</p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Progress value={r.analysis.qualityScore} className="h-1 flex-1" />
+                <span className="text-[11px] font-semibold text-muted-foreground">{r.analysis.qualityScore}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="space-y-6 min-w-0">
+        {/* Header */}
+        <Card className="shadow-soft border-border/60">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl font-bold text-foreground truncate">{req.title}</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Analyzed {new Date(req.createdAt).toLocaleString()}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Badge variant="secondary"><FileText className="h-3 w-3 mr-1" />{a.userStories.length} stories</Badge>
+                  <Badge variant="secondary"><ShieldAlert className="h-3 w-3 mr-1" />{a.risks.length} risks</Badge>
+                  <Badge variant="secondary"><Users className="h-3 w-3 mr-1" />{a.stakeholders.length} stakeholders</Badge>
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center min-w-[140px] p-4 rounded-xl bg-gradient-subtle border border-border">
+                <p className={`text-4xl font-bold ${scoreTone}`}>{a.qualityScore}</p>
+                <p className="text-xs text-muted-foreground">Quality Score</p>
+                <Badge variant="outline" className={`mt-2 ${scoreTone} border-current`}>{scoreLabel}</Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Export Panel */}
+        <Card className="shadow-soft border-border/60">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <div className="flex items-center gap-2">
+              <Download className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Export this analysis</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => { exportPDF(req); toast.success("PDF print dialog opened"); }}>
+                <Printer className="h-4 w-4 mr-2" /> PDF
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { exportDOCX(req); toast.success("DOCX downloaded"); }}>
+                <FileType2 className="h-4 w-4 mr-2" /> DOCX
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { exportCSV(req); toast.success("CSV downloaded"); }}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  deleteRequirement(req.id);
+                  setParams({});
+                  toast.success("Requirement deleted");
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="stories">User Stories</TabsTrigger>
+            <TabsTrigger value="people">Stakeholders</TabsTrigger>
+            <TabsTrigger value="risks">Risks</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analysis" className="space-y-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="shadow-soft border-border/60">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-warning" /> Ambiguities ({a.ambiguities.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {a.ambiguities.length ? (
+                    <ul className="space-y-2">
+                      {a.ambiguities.map((x, i) => (
+                        <li key={i} className="text-sm text-foreground flex gap-2">
+                          <span className="text-warning shrink-0">•</span>
+                          <span>{x}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-success" /> No ambiguities detected
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-soft border-border/60">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4 text-primary" /> Missing Information ({a.missingInfo.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {a.missingInfo.map((x, i) => (
+                      <li key={i} className="text-sm text-foreground flex gap-2">
+                        <span className="text-primary shrink-0">•</span>
+                        <span>{x}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-soft border-border/60">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4 text-accent-foreground" /> Clarification Questions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className="space-y-2 list-decimal list-inside">
+                    {a.clarificationQuestions.map((x, i) => (
+                      <li key={i} className="text-sm text-foreground">{x}</li>
+                    ))}
+                  </ol>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-soft border-border/60">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-warning" /> Improvement Suggestions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {a.improvementSuggestions.map((x, i) => (
+                      <li key={i} className="text-sm text-foreground flex gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                        <span>{x}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="shadow-soft border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Assumptions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1.5">
+                  {a.assumptions.map((x, i) => (
+                    <li key={i} className="text-sm text-muted-foreground">— {x}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-soft border-border/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Original Requirement</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed bg-muted/40 p-4 rounded-lg border border-border">
+                  {req.rawText}
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="stories" className="space-y-4 mt-4">
+            {a.userStories.map((s, i) => (
+              <Card key={s.id} className="shadow-soft border-border/60">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <CardTitle className="text-sm">User Story #{i + 1}</CardTitle>
+                    <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority} priority</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
+                    <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
+                    <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
+                    <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                      Acceptance Criteria (Gherkin)
+                    </p>
+                    <div className="space-y-2">
+                      {s.acceptanceCriteria.map((ac, j) => (
+                        <pre
+                          key={j}
+                          className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed"
+                        >
+                          {ac}
+                        </pre>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="people" className="mt-4">
+            <Card className="shadow-soft border-border/60">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Stakeholder</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Interest</TableHead>
+                      <TableHead>Influence</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {a.stakeholders.map((s, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{s.name}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.role}</TableCell>
+                        <TableCell><Badge variant="outline">{s.interest}</Badge></TableCell>
+                        <TableCell><Badge variant="outline">{s.influence}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="risks" className="mt-4">
+            <Card className="shadow-soft border-border/60">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Risk</TableHead>
+                      <TableHead className="w-24">Impact</TableHead>
+                      <TableHead className="w-28">Likelihood</TableHead>
+                      <TableHead>Mitigation</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {a.risks.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-medium">{r.description}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              r.impact === "High"
+                                ? "bg-destructive/10 text-destructive border-destructive/30"
+                                : r.impact === "Medium"
+                                ? "bg-warning/10 text-warning border-warning/30"
+                                : "bg-muted"
+                            }
+                          >
+                            {r.impact}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{r.likelihood}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{r.mitigation}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+}

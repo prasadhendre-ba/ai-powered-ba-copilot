@@ -182,6 +182,20 @@ const EMPTY_BRD: BRD = {
   successMetrics: [],
 };
 
+const EMPTY_ACTIVITY: ActivityDiagram = {
+  startNode: "Start",
+  endNodes: [],
+  activities: [],
+  decisions: [],
+  alternatePaths: [],
+  exceptionPaths: [],
+  actorActions: [],
+  systemActions: [],
+  integrationPoints: [],
+  textActivityFlow: [],
+  mermaid: "flowchart TD\n  Start((Start)) --> A[Activity]\n  A --> End((End))",
+};
+
 const EMPTY_FLOW: ProcessFlow = {
   actors: [],
   activities: [],
@@ -191,6 +205,7 @@ const EMPTY_FLOW: ProcessFlow = {
   endStates: [],
   textFlow: [],
   mermaid: "flowchart TD\n  Start((Start)) --> A[Process]\n  A --> End((End))",
+  activityDiagram: EMPTY_ACTIVITY,
 };
 
 export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {

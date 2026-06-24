@@ -25,13 +25,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
+        <div className="flex items-center gap-2.5 px-2 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
             <Sparkles className="h-5 w-5 text-primary-foreground" />
           </div>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-bold text-sidebar-foreground leading-tight">AI BA Copilot</span>
-            <span className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60">Pro</span>
+          <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-bold text-sidebar-foreground leading-tight truncate">
+              AI BA Copilot Pro
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60 truncate">
+              AI-Powered Business Analysis Platform
+            </span>
           </div>
         </div>
       </SidebarHeader>

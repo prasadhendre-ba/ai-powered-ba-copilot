@@ -265,6 +265,47 @@ export default function Artifacts() {
           </Card>
         </div>
 
+        {/* Score rationale */}
+        <Card className="shadow-soft border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Score Rationale</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-success uppercase tracking-wider mb-2 flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Strengths
+              </p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.strengths.length ? a.scoreRationale.strengths.map((x, i) => (
+                  <li key={i} className="text-sm text-foreground flex gap-2"><span className="text-success shrink-0">+</span><span>{x}</span></li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-warning uppercase tracking-wider mb-2 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" /> Weaknesses
+              </p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.weaknesses.length ? a.scoreRationale.weaknesses.map((x, i) => (
+                  <li key={i} className="text-sm text-foreground flex gap-2"><span className="text-warning shrink-0">−</span><span>{x}</span></li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-destructive uppercase tracking-wider mb-2">Deductions</p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.deductions.length ? a.scoreRationale.deductions.map((d, i) => (
+                  <li key={i} className="text-sm text-foreground">
+                    <span className="font-semibold">{d.dimension}</span>{" "}
+                    <span className="text-xs font-mono text-muted-foreground">({d.points}/10)</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">{d.reason}</p>
+                  </li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Export Panel */}
         <Card className="shadow-soft border-border/60">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">

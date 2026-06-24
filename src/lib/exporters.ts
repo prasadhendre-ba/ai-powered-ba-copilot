@@ -157,6 +157,11 @@ const SHARED_CSS = `
   .cover .doc-type{letter-spacing:.2em;text-transform:uppercase;color:#64748b;font-size:12px}
   .traced{color:#16a34a;font-weight:600}
   .orphan{color:#ea580c;font-weight:600}
+  .brand-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1e40af;padding-bottom:10px;margin-bottom:20px}
+  .brand-header .brand-name{font-size:16px;font-weight:700;color:#1e40af;letter-spacing:.02em}
+  .brand-header .brand-tag{font-size:11px;text-transform:uppercase;letter-spacing:.18em;color:#64748b}
+  .brand-footer{margin-top:48px;padding-top:12px;border-top:1px solid #cbd5e1;color:#64748b;font-size:11px;line-height:1.5;text-align:center}
+  @media print{.brand-footer{position:fixed;bottom:8mm;left:0;right:0}}
 `;
 
 function openPrintWindow(html: string) {

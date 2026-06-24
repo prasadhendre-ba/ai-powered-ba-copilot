@@ -72,6 +72,20 @@ export interface BRD {
 
 export interface DecisionPoint { question: string; yesPath: string; noPath: string; }
 
+export interface ActivityDiagram {
+  startNode: string;
+  endNodes: string[];
+  activities: string[];
+  decisions: DecisionPoint[];
+  alternatePaths: string[];
+  exceptionPaths: string[];
+  actorActions: { actor: string; action: string }[];
+  systemActions: string[];
+  integrationPoints: string[];
+  textActivityFlow: string[];
+  mermaid: string;
+}
+
 export interface ProcessFlow {
   actors: string[];
   activities: string[];
@@ -81,6 +95,7 @@ export interface ProcessFlow {
   endStates: string[];
   textFlow: string[];
   mermaid: string;
+  activityDiagram: ActivityDiagram;
 }
 
 export interface Analysis {

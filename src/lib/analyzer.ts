@@ -72,6 +72,20 @@ export interface BRD {
 
 export interface DecisionPoint { question: string; yesPath: string; noPath: string; }
 
+export interface ActivityDiagram {
+  startNode: string;
+  endNodes: string[];
+  activities: string[];
+  decisions: DecisionPoint[];
+  alternatePaths: string[];
+  exceptionPaths: string[];
+  actorActions: { actor: string; action: string }[];
+  systemActions: string[];
+  integrationPoints: string[];
+  textActivityFlow: string[];
+  mermaid: string;
+}
+
 export interface ProcessFlow {
   actors: string[];
   activities: string[];
@@ -81,6 +95,7 @@ export interface ProcessFlow {
   endStates: string[];
   textFlow: string[];
   mermaid: string;
+  activityDiagram: ActivityDiagram;
 }
 
 export interface Analysis {
@@ -167,6 +182,20 @@ const EMPTY_BRD: BRD = {
   successMetrics: [],
 };
 
+const EMPTY_ACTIVITY: ActivityDiagram = {
+  startNode: "Start",
+  endNodes: [],
+  activities: [],
+  decisions: [],
+  alternatePaths: [],
+  exceptionPaths: [],
+  actorActions: [],
+  systemActions: [],
+  integrationPoints: [],
+  textActivityFlow: [],
+  mermaid: "flowchart TD\n  Start((Start)) --> A[Activity]\n  A --> End((End))",
+};
+
 const EMPTY_FLOW: ProcessFlow = {
   actors: [],
   activities: [],
@@ -176,6 +205,7 @@ const EMPTY_FLOW: ProcessFlow = {
   endStates: [],
   textFlow: [],
   mermaid: "flowchart TD\n  Start((Start)) --> A[Process]\n  A --> End((End))",
+  activityDiagram: EMPTY_ACTIVITY,
 };
 
 export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
@@ -226,7 +256,11 @@ export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
     assumptions: raw.assumptions ?? [],
     highlights: raw.highlights ?? [],
     brd: { ...EMPTY_BRD, ...(raw.brd ?? {}) },
-    processFlow: { ...EMPTY_FLOW, ...(raw.processFlow ?? {}) },
+    processFlow: {
+      ...EMPTY_FLOW,
+      ...(raw.processFlow ?? {}),
+      activityDiagram: { ...EMPTY_ACTIVITY, ...(raw.processFlow?.activityDiagram ?? {}) },
+    },
   };
 }
 

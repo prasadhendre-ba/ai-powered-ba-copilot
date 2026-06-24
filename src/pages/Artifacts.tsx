@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
 import { toast } from "sonner";
-import type { Highlight, Requirement } from "@/lib/analyzer";
+import { SCORE_DIMENSIONS, type Highlight, type Requirement } from "@/lib/analyzer";
 
 const CATEGORY_STYLE: Record<Highlight["category"], string> = {
   ambiguous: "bg-warning/25 text-warning-foreground underline decoration-warning decoration-wavy",
@@ -93,15 +93,16 @@ function HighlightedText({ req }: { req: Requirement }) {
   );
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  const tone = value >= 75 ? "text-success" : value >= 50 ? "text-warning" : "text-destructive";
+function ScoreBar({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
+  const pct = max === 10 ? value * 10 : value;
+  const tone = pct >= 75 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={`font-semibold ${tone}`}>{value}</span>
+        <span className={`font-semibold ${tone}`}>{value}/{max}</span>
       </div>
-      <Progress value={value} className="h-1.5" />
+      <Progress value={pct} className="h-1.5" />
     </div>
   );
 }

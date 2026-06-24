@@ -88,8 +88,9 @@ export function exportCSV(req: Requirement) {
 function renderAnalysisHTML(req: Requirement) {
   const a = req.analysis;
   const sbRows = Object.entries(a.scoreBreakdown).map(([k, v]) => `<tr><td>${k}</td><td>${v}/10</td></tr>`).join("");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — ${BRAND.name}</title>
 <style>${SHARED_CSS}</style></head><body>
+${brandHeader()}
 <h1>${escapeHtml(req.title)}</h1>
 <p>Generated ${new Date(req.createdAt).toLocaleDateString()} · Confidence ${a.confidence}%</p>
 <div class="score">Quality Score: ${a.qualityScore}/100</div>

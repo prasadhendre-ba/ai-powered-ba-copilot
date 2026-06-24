@@ -16,6 +16,12 @@ mermaid.initialize({
   },
 });
 
+export async function renderMermaidSvg(chart: string): Promise<string> {
+  const id = `mmd-${Math.random().toString(36).slice(2, 8)}`;
+  const { svg } = await mermaid.render(id, chart);
+  return svg;
+}
+
 interface Props { chart: string; id?: string; fallback?: ReactNode; }
 
 export function MermaidDiagram({ chart, id = "mermaid", fallback }: Props) {

@@ -59,9 +59,3 @@ export function MermaidDiagram({ chart, id = "mermaid", fallback }: Props) {
   return <div ref={ref} className="overflow-auto p-4 rounded-lg border border-border bg-card" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
-
-export async function renderMermaidSvg(chart: string): Promise<string> {
-  const renderId = `export-${Math.random().toString(36).slice(2, 8)}`;
-  const { svg } = await mermaid.render(renderId, chart);
-  return svg;
-}

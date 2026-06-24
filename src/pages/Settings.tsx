@@ -5,14 +5,84 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Bell, FileDown, Sliders, Trash2 } from "lucide-react";
+import { Building2, Bell, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User } from "lucide-react";
 import { toast } from "sonner";
+
+const KEY_FEATURES = [
+  "Requirement Quality Assessment",
+  "Ambiguity & Gap Analysis",
+  "Clarification Question Generation",
+  "User Story Generation",
+  "Gherkin Acceptance Criteria",
+  "Stakeholder Analysis",
+  "Risk Register Generation",
+  "Business Requirements Document (BRD)",
+  "Requirement Traceability Matrix (RTM)",
+  "UML Activity Diagrams",
+];
+
+const DOMAINS = ["Insurance", "Banking", "Financial Services", "E-Commerce"];
 
 export default function SettingsPage() {
   const { settings, updateSettings, requirements, deleteRequirement } = useStore();
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
+      <Card className="shadow-elevated border-border/60 overflow-hidden">
+        <div className="bg-gradient-primary px-6 py-5 text-primary-foreground flex items-start gap-3">
+          <div className="h-10 w-10 shrink-0 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">About AI BA Copilot Pro</h2>
+            <p className="text-xs text-primary-foreground/85 mt-0.5">
+              AI-Powered Business Analysis Platform
+            </p>
+          </div>
+        </div>
+        <CardContent className="p-6 space-y-6">
+          <p className="text-sm text-foreground leading-relaxed">
+            AI BA Copilot Pro is an AI-powered Business Analysis platform designed to
+            help Business Analysts transform raw stakeholder requirements into
+            structured, traceable, and enterprise-ready BA deliverables.
+          </p>
+
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Key Features</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+              {KEY_FEATURES.map((f) => (
+                <div key={f} className="flex items-center gap-2 text-sm text-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                  <span>{f}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Supported Domains</h3>
+            <div className="flex flex-wrap gap-2">
+              {DOMAINS.map((d) => (
+                <span
+                  key={d}
+                  className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium"
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" /> Created By
+            </h3>
+            <p className="text-sm font-medium text-foreground">Prasad Hendre</p>
+            <p className="text-xs text-muted-foreground mt-0.5">MBA | Business Analyst</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="shadow-soft border-border/60">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">

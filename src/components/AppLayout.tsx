@@ -43,6 +43,10 @@ export default function AppLayout() {
           <main className="flex-1 p-4 md:p-6 lg:p-8 animate-fade-in">
             <Outlet />
           </main>
+          <footer className="border-t border-border bg-card/60 px-4 md:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-muted-foreground">
+            <span>AI BA Copilot Pro © 2026 · AI-Powered Business Analysis Platform</span>
+            <span>Created by <span className="font-medium text-foreground">Prasad Hendre</span> · MBA | Business Analyst</span>
+          </footer>
         </div>
       </div>
     </SidebarProvider>

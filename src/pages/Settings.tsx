@@ -2,10 +2,10 @@ import { useStore } from "@/lib/store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Bell, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User } from "lucide-react";
+import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const KEY_FEATURES = [
@@ -151,22 +151,31 @@ export default function SettingsPage() {
       <Card className="shadow-soft border-border/60">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <Bell className="h-4 w-4 text-primary" /> Notifications
+            <Info className="h-4 w-4 text-primary" /> Product Information
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
             <div>
-              <Label className="text-sm">Email notifications</Label>
-              <p className="text-xs text-muted-foreground mt-0.5">Get alerts when analyses complete</p>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Product</dt>
+              <dd className="font-medium text-foreground">AI BA Copilot Pro</dd>
             </div>
-            <Switch
-              checked={settings.notifications}
-              onCheckedChange={(v) => updateSettings({ notifications: v })}
-            />
-          </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Category</dt>
+              <dd className="font-medium text-foreground">AI-Powered Business Analysis Platform</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Version</dt>
+              <dd className="font-medium text-foreground">1.0</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Release Date</dt>
+              <dd className="font-medium text-foreground">June 2026</dd>
+            </div>
+          </dl>
         </CardContent>
       </Card>
+
 
       <Card className="shadow-soft border-destructive/30">
         <CardHeader>

@@ -37,8 +37,10 @@ Produce a complete brd object suitable for stakeholder review:
 - dependencies (3-7 bullets — systems, teams, data sources)
 - successMetrics (3-7 measurable KPIs, e.g. "Reduce claim processing time from 5 days to 2 days")
 
-=== PROCESS FLOW ===
-Produce a processFlow object describing the end-to-end business process implied by this requirement:
+=== PROCESS FLOW + UML ACTIVITY DIAGRAM ===
+Produce a processFlow object with TWO complementary views of the end-to-end business process implied by this requirement:
+
+1) BUSINESS PROCESS FLOW (high-level, swimlane-style narrative):
 - actors: array of actor names (e.g. "Customer", "Underwriter", "Core Banking System")
 - activities: ordered array of activity step labels (verb phrases, e.g. "Create Claim", "Upload Documents")
 - decisionPoints: array of { question, yesPath, noPath } objects for branches in the flow
@@ -46,7 +48,30 @@ Produce a processFlow object describing the end-to-end business process implied 
 - integrations: array of external systems touched
 - endStates: array of terminal outcomes (e.g. "Settlement Completed", "Claim Rejected")
 - textFlow: ordered array of step strings forming a readable narrative (arrows implied)
-- mermaid: a complete valid Mermaid \`flowchart TD\` diagram of the process. Use square brackets for actions, rhombus {} for decisions, rounded () for start, double-circle (()) for end states. Use --> and -->|Yes|/|No| labels on decisions. Node IDs must be short alphanumeric (A, B, C, D1…). Do NOT include the surrounding markdown code fence — only the raw mermaid source starting with "flowchart TD".
+- mermaid: a complete valid Mermaid \`flowchart TD\` diagram of the business process. Use () for start, [] for actions, {} for decisions, (()) for end states. Use -->|Yes|/|No| labels on decisions. Node IDs must be short alphanumeric. NO code fences.
+
+2) activityDiagram — a proper UML Activity Diagram derived from the SAME requirement, more granular than the business flow. Must explicitly model:
+   - startNode: label for the initial node (typically "Start")
+   - endNodes: array of final/terminal node labels (success AND failure outcomes)
+   - activities: ordered list of activity labels (verb-object), including BOTH actor actions and system actions
+   - decisions: array of { question, yesPath, noPath } — every validation branch, approval/rejection branch, and conditional path
+   - alternatePaths: array of alternate-flow descriptions (e.g. "User chooses social login instead of email")
+   - exceptionPaths: array of exception/error scenario descriptions (e.g. "Payment gateway timeout → retry then refund")
+   - actorActions: array of { actor, action } pairs assigning responsibility (e.g. {actor:"Customer", action:"Submit KYC documents"})
+   - systemActions: array of automated/system-performed actions
+   - integrationPoints: array of integration touchpoints (named external systems with the action, e.g. "CIBIL — fetch credit score")
+   - textActivityFlow: an ordered, numbered textual UML activity flow that a BA can paste into a document. Use prefixes like "[Start]", "[Activity]", "[Decision]", "[Validation]", "[Exception]", "[Integration]", "[Actor: X]", "[System]", "[Merge]", "[End: <outcome>]". One step per array entry.
+   - mermaid: a complete valid Mermaid diagram of the UML activity diagram. Use \`flowchart TD\` syntax (preferred for broad compatibility). Conventions:
+       * Start: \`Start(([Start]))\`
+       * Activities: \`A1[Submit Application]\`
+       * Decisions: \`D1{Is application valid?}\` with branches \`-->|Yes| ...\` / \`-->|No| ...\`
+       * Validation/exception branches must be explicit, including rejoin/merge nodes where applicable
+       * Integration calls: \`I1[/Call CIBIL API/]\` (parallelogram shape) or labeled clearly
+       * System actions vs actor actions: prefix label with actor in parentheses, e.g. \`A2[(Customer) Upload Documents]\` or \`S1[(System) Generate Reference Number]\`
+       * End nodes: \`E1(((Approved)))\`, \`E2(((Rejected)))\`, \`E3(((Cancelled)))\`
+       * Node IDs short alphanumeric. NO markdown code fences. Must start with \`flowchart TD\`.
+   The mermaid MUST be syntactically valid (balanced brackets, no stray characters, every node referenced is defined). If a textActivityFlow step has no diagram equivalent, still keep both consistent.
+
 
 === OTHER OUTPUTS ===
 - confidence (0-100)

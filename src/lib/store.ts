@@ -22,10 +22,9 @@ export const useStore = create<AppState>()(
     (set) => ({
       requirements: [],
       settings: {
-        organization: "Acme Corp",
+        organization: "AI BA Copilot Pro Workspace",
         defaultPriority: "Medium",
         exportFormat: "PDF",
-        notifications: true,
       },
       addRequirementFromAi: (title, rawText, raw) => {
         const analysis = normalizeAnalysis(raw);

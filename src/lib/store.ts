@@ -45,12 +45,20 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "ba-copilot-store",
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, version) => {
         if (!persisted || typeof persisted !== "object") return persisted as AppState;
-        // Schemas before v4 lack brd/processFlow — drop incompatible analyses.
+        // v4 dropped legacy analyses; v5 removed notifications + rebranded org default.
         if (version < 4) {
           return { ...(persisted as object), requirements: [] } as AppState;
+        }
+        if (version < 5) {
+          const p = persisted as { settings?: Record<string, unknown> };
+          const { notifications: _drop, organization, ...restSettings } = (p.settings ?? {}) as Record<string, unknown>;
+          const org = (typeof organization === "string" && organization && organization !== "Acme Corp")
+            ? organization
+            : "AI BA Copilot Pro Workspace";
+          return { ...p, settings: { ...restSettings, organization: org } } as unknown as AppState;
         }
         return persisted as AppState;
       },

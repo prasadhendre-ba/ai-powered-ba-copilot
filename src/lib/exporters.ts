@@ -135,6 +135,7 @@ ${a.risks.map((r) => `<tr><td>${escapeHtml(r.description)}</td><td>${r.impact}</
 </table>
 
 <h2>Assumptions</h2><ul>${a.assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+${brandFooter()}
 </body></html>`;
 }
 

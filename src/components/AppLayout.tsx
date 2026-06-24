@@ -14,7 +14,7 @@ const titles: Record<string, { title: string; sub: string }> = {
 
 export default function AppLayout() {
   const { pathname } = useLocation();
-  const meta = titles[pathname] ?? { title: "AI BA Copilot", sub: "" };
+  const meta = titles[pathname] ?? { title: "AI BA Copilot Pro", sub: "AI-Powered Business Analysis Platform" };
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-subtle">

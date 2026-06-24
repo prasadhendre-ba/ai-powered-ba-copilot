@@ -262,6 +262,7 @@ function renderBrdHTML(req: Requirement) {
   ${sect(13, "Risks", `<table><tr><th>ID</th><th>Description</th><th>Impact</th><th>Likelihood</th><th>Mitigation</th></tr>${riskRows}</table>`)}
   ${sect(14, "Dependencies", ul(b.dependencies))}
   ${sect(15, "Success Metrics", ul(b.successMetrics))}
+  ${brandFooter()}
   </body></html>`;
 }
 

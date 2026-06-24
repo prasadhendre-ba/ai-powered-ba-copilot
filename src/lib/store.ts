@@ -47,11 +47,11 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "ba-copilot-store",
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, version) => {
         if (!persisted || typeof persisted !== "object") return persisted as AppState;
-        // v1/v2 analyses use an incompatible scoreBreakdown shape — drop them.
-        if (version < 3) {
+        // Schemas before v4 lack brd/processFlow — drop incompatible analyses.
+        if (version < 4) {
           return { ...(persisted as object), requirements: [] } as AppState;
         }
         return persisted as AppState;

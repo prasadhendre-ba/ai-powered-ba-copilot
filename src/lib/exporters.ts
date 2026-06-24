@@ -242,7 +242,8 @@ function renderBrdHTML(req: Requirement) {
   const riskRows = a.risks.map((r, i) => `<tr><td>RISK-${String(i + 1).padStart(3, "0")}</td><td>${escapeHtml(r.description)}</td><td>${r.impact}</td><td>${r.likelihood}</td><td>${escapeHtml(r.mitigation)}</td></tr>`).join("");
   const stkRows = a.stakeholders.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.role)}</td><td>${s.interest}</td><td>${s.influence}</td></tr>`).join("");
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — BRD</title><style>${SHARED_CSS}</style></head><body>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — BRD — ${BRAND.name}</title><style>${SHARED_CSS}</style></head><body>
+  ${brandHeader()}
   <div class="cover"><p class="doc-type">Business Requirements Document</p><h1>${escapeHtml(req.title)}</h1>
   <p>Doc ID: BRD-${req.id.toUpperCase()} · ${new Date(req.createdAt).toLocaleDateString()} · Confidence ${a.confidence}%</p></div>
 

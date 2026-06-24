@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Bell, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User } from "lucide-react";
+import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info } from "lucide-react";
 import { toast } from "sonner";
 
 const KEY_FEATURES = [

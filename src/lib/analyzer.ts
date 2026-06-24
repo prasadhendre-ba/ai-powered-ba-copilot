@@ -22,34 +22,11 @@ export interface ScoreBreakdown {
   testability: number;
 }
 
-export interface ScoreDeduction {
-  dimension: string;
-  points: number;
-  reason: string;
-}
-
-export interface ScoreRationale {
-  strengths: string[];
-  weaknesses: string[];
-  deductions: ScoreDeduction[];
-}
-
-export interface Ambiguity {
-  term: string;
-  reason: string;
-}
-
-export interface Highlight {
-  text: string;
-  category: "ambiguous" | "missing" | "risk";
-  note: string;
-}
-
-export interface AcceptanceCriteria {
-  happyPath: string;
-  validation: string;
-  exception: string;
-}
+export interface ScoreDeduction { dimension: string; points: number; reason: string; }
+export interface ScoreRationale { strengths: string[]; weaknesses: string[]; deductions: ScoreDeduction[]; }
+export interface Ambiguity { term: string; reason: string; }
+export interface Highlight { text: string; category: "ambiguous" | "missing" | "risk"; note: string; }
+export interface AcceptanceCriteria { happyPath: string; validation: string; exception: string; }
 
 export interface UserStory {
   id: string;
@@ -79,6 +56,33 @@ export interface Risk {
   mitigation: string;
 }
 
+export interface BRD {
+  executiveSummary: string;
+  businessObjective: string;
+  problemStatement: string;
+  currentState: string;
+  futureState: string;
+  inScope: string[];
+  outOfScope: string[];
+  constraints: string[];
+  businessRules: string[];
+  dependencies: string[];
+  successMetrics: string[];
+}
+
+export interface DecisionPoint { question: string; yesPath: string; noPath: string; }
+
+export interface ProcessFlow {
+  actors: string[];
+  activities: string[];
+  decisionPoints: DecisionPoint[];
+  systemActions: string[];
+  integrations: string[];
+  endStates: string[];
+  textFlow: string[];
+  mermaid: string;
+}
+
 export interface Analysis {
   qualityScore: number;
   confidence: number;
@@ -99,6 +103,8 @@ export interface Analysis {
   risks: Risk[];
   assumptions: string[];
   highlights: Highlight[];
+  brd: BRD;
+  processFlow: ProcessFlow;
 }
 
 export interface RawAiAnalysis {
@@ -121,6 +127,8 @@ export interface RawAiAnalysis {
   risks: Omit<Risk, "id">[];
   assumptions: string[];
   highlights: Highlight[];
+  brd?: BRD;
+  processFlow?: ProcessFlow;
 }
 
 export const SCORE_DIMENSIONS: { key: keyof ScoreBreakdown; label: string }[] = [
@@ -144,6 +152,31 @@ function clamp(n: number, min = 0, max = 100) {
   if (typeof n !== "number" || Number.isNaN(n)) return 0;
   return Math.max(min, Math.min(max, Math.round(n)));
 }
+
+const EMPTY_BRD: BRD = {
+  executiveSummary: "",
+  businessObjective: "",
+  problemStatement: "",
+  currentState: "",
+  futureState: "",
+  inScope: [],
+  outOfScope: [],
+  constraints: [],
+  businessRules: [],
+  dependencies: [],
+  successMetrics: [],
+};
+
+const EMPTY_FLOW: ProcessFlow = {
+  actors: [],
+  activities: [],
+  decisionPoints: [],
+  systemActions: [],
+  integrations: [],
+  endStates: [],
+  textFlow: [],
+  mermaid: "flowchart TD\n  Start((Start)) --> A[Process]\n  A --> End((End))",
+};
 
 export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
   const labeled = (label: string, items: string[] = []) => items.map((i) => `${label}: ${i}`);
@@ -192,5 +225,94 @@ export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
     risks: (raw.risks ?? []).map((r) => ({ ...r, id: uid() })),
     assumptions: raw.assumptions ?? [],
     highlights: raw.highlights ?? [],
+    brd: { ...EMPTY_BRD, ...(raw.brd ?? {}) },
+    processFlow: { ...EMPTY_FLOW, ...(raw.processFlow ?? {}) },
   };
+}
+
+// === Traceability Matrix derivation ===
+export interface RtmRow {
+  requirementId: string;
+  requirementDescription: string;
+  userStoryId: string;
+  acceptanceCriteriaId: string;
+  riskId: string;
+  stakeholder: string;
+  priority: string;
+  status: "Traced" | "Orphan Story" | "Orphan Requirement";
+}
+
+export interface RtmReport {
+  rows: RtmRow[];
+  coverage: number;
+  orphanRequirements: string[];
+  orphanStories: string[];
+}
+
+const AC_SUFFIX = [
+  { key: "happyPath" as const, suffix: "HP" },
+  { key: "validation" as const, suffix: "VAL" },
+  { key: "exception" as const, suffix: "EX" },
+];
+
+export function buildRtm(req: Requirement): RtmReport {
+  const a = req.analysis;
+  const reqId = "REQ-001";
+  const reqDesc = req.title;
+  const stories = a.userStories;
+  const risks = a.risks;
+  const stakeholders = a.stakeholders;
+
+  const rows: RtmRow[] = [];
+  if (!stories.length) {
+    rows.push({
+      requirementId: reqId,
+      requirementDescription: reqDesc,
+      userStoryId: "—",
+      acceptanceCriteriaId: "—",
+      riskId: "—",
+      stakeholder: stakeholders[0]?.name ?? "—",
+      priority: "—",
+      status: "Orphan Requirement",
+    });
+  } else {
+    stories.forEach((s, sIdx) => {
+      AC_SUFFIX.forEach(({ key, suffix }) => {
+        const hasAc = !!s.acceptanceCriteria?.[key]?.trim();
+        if (!hasAc) return;
+        const risk = risks[sIdx % Math.max(risks.length, 1)];
+        const stakeholder = stakeholders[sIdx % Math.max(stakeholders.length, 1)];
+        rows.push({
+          requirementId: reqId,
+          requirementDescription: reqDesc,
+          userStoryId: s.storyId,
+          acceptanceCriteriaId: `AC-${s.storyId}-${suffix}`,
+          riskId: risk ? `RISK-${String(risks.indexOf(risk) + 1).padStart(3, "0")}` : "—",
+          stakeholder: stakeholder?.name ?? "—",
+          priority: s.priority,
+          status: "Traced",
+        });
+      });
+      // story with no AC at all → orphan
+      const hasAny = AC_SUFFIX.some(({ key }) => !!s.acceptanceCriteria?.[key]?.trim());
+      if (!hasAny) {
+        rows.push({
+          requirementId: reqId,
+          requirementDescription: reqDesc,
+          userStoryId: s.storyId,
+          acceptanceCriteriaId: "—",
+          riskId: "—",
+          stakeholder: "—",
+          priority: s.priority,
+          status: "Orphan Story",
+        });
+      }
+    });
+  }
+
+  const traced = rows.filter((r) => r.status === "Traced").length;
+  const coverage = rows.length ? Math.round((traced / rows.length) * 100) : 0;
+  const orphanStories = rows.filter((r) => r.status === "Orphan Story").map((r) => r.userStoryId);
+  const orphanRequirements = rows.filter((r) => r.status === "Orphan Requirement").map((r) => r.requirementId);
+  return { rows, coverage, orphanRequirements, orphanStories };
 }

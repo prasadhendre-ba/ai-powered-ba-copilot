@@ -47,12 +47,11 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "ba-copilot-store",
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version) => {
-        // v1 had locally-heuristic analyses with a different shape. Drop them so the
-        // user only sees real AI-generated analyses going forward.
         if (!persisted || typeof persisted !== "object") return persisted as AppState;
-        if (version < 2) {
+        // v1/v2 analyses use an incompatible scoreBreakdown shape — drop them.
+        if (version < 3) {
           return { ...(persisted as object), requirements: [] } as AppState;
         }
         return persisted as AppState;

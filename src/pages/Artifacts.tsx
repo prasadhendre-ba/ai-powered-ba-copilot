@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
 import { toast } from "sonner";
-import type { Highlight, Requirement } from "@/lib/analyzer";
+import { SCORE_DIMENSIONS, type Highlight, type Requirement } from "@/lib/analyzer";
 
 const CATEGORY_STYLE: Record<Highlight["category"], string> = {
   ambiguous: "bg-warning/25 text-warning-foreground underline decoration-warning decoration-wavy",
@@ -93,15 +93,16 @@ function HighlightedText({ req }: { req: Requirement }) {
   );
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  const tone = value >= 75 ? "text-success" : value >= 50 ? "text-warning" : "text-destructive";
+function ScoreBar({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
+  const pct = max === 10 ? value * 10 : value;
+  const tone = pct >= 75 ? "text-success" : pct >= 50 ? "text-warning" : "text-destructive";
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={`font-semibold ${tone}`}>{value}</span>
+        <span className={`font-semibold ${tone}`}>{value}/{max}</span>
       </div>
-      <Progress value={value} className="h-1.5" />
+      <Progress value={pct} className="h-1.5" />
     </div>
   );
 }
@@ -239,15 +240,13 @@ export default function Artifacts() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Gauge className="h-4 w-4 text-primary" /> Quality Breakdown
+                <Badge variant="secondary" className="ml-auto text-[11px]">{a.qualityScore}/100</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-              <ScoreBar label="Clarity" value={a.scoreBreakdown.clarity} />
-              <ScoreBar label="Completeness" value={a.scoreBreakdown.completeness} />
-              <ScoreBar label="Consistency" value={a.scoreBreakdown.consistency} />
-              <ScoreBar label="Testability" value={a.scoreBreakdown.testability} />
-              <ScoreBar label="Business Context" value={a.scoreBreakdown.businessContext} />
-              <ScoreBar label="Functional Detail" value={a.scoreBreakdown.missingFunctionalDetails} />
+              {SCORE_DIMENSIONS.map((d) => (
+                <ScoreBar key={d.key} label={d.label} value={a.scoreBreakdown[d.key]} max={10} />
+              ))}
             </CardContent>
           </Card>
 
@@ -265,6 +264,47 @@ export default function Artifacts() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Score rationale */}
+        <Card className="shadow-soft border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Score Rationale</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <p className="text-xs font-semibold text-success uppercase tracking-wider mb-2 flex items-center gap-1">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Strengths
+              </p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.strengths.length ? a.scoreRationale.strengths.map((x, i) => (
+                  <li key={i} className="text-sm text-foreground flex gap-2"><span className="text-success shrink-0">+</span><span>{x}</span></li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-warning uppercase tracking-wider mb-2 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" /> Weaknesses
+              </p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.weaknesses.length ? a.scoreRationale.weaknesses.map((x, i) => (
+                  <li key={i} className="text-sm text-foreground flex gap-2"><span className="text-warning shrink-0">−</span><span>{x}</span></li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-destructive uppercase tracking-wider mb-2">Deductions</p>
+              <ul className="space-y-1.5">
+                {a.scoreRationale.deductions.length ? a.scoreRationale.deductions.map((d, i) => (
+                  <li key={i} className="text-sm text-foreground">
+                    <span className="font-semibold">{d.dimension}</span>{" "}
+                    <span className="text-xs font-mono text-muted-foreground">({d.points}/10)</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">{d.reason}</p>
+                  </li>
+                )) : <li className="text-xs text-muted-foreground">—</li>}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Export Panel */}
         <Card className="shadow-soft border-border/60">
@@ -434,46 +474,60 @@ export default function Artifacts() {
           </TabsContent>
 
           <TabsContent value="stories" className="space-y-4 mt-4">
-            {a.userStories.map((s, i) => (
-              <Card key={s.id} className="shadow-soft border-border/60">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-sm">User Story #{i + 1}</CardTitle>
-                    <Badge variant="outline" className={priorityColor[s.priority]}>
-                      {s.priority} priority
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
-                    <p>
-                      <span className="font-semibold text-primary">As a</span> {s.asA},
-                    </p>
-                    <p>
-                      <span className="font-semibold text-primary">I want</span> {s.iWant},
-                    </p>
-                    <p>
-                      <span className="font-semibold text-primary">so that</span> {s.soThat}.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      Acceptance Criteria (Gherkin)
-                    </p>
-                    <div className="space-y-2">
-                      {s.acceptanceCriteria.map((ac, j) => (
-                        <pre
-                          key={j}
-                          className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed"
-                        >
-                          {ac}
-                        </pre>
-                      ))}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {a.userStories.length} backlog-ready stories ·{" "}
+                {a.userStories.reduce((sum, s) => sum + (s.complexityPoints ?? 0), 0)} total story points
+              </p>
+            </div>
+            {a.userStories.map((s) => {
+              const acRows: { label: string; gherkin: string }[] = [
+                { label: "Happy Path", gherkin: s.acceptanceCriteria?.happyPath ?? "" },
+                { label: "Validation Scenario", gherkin: s.acceptanceCriteria?.validation ?? "" },
+                { label: "Exception Scenario", gherkin: s.acceptanceCriteria?.exception ?? "" },
+              ];
+              return (
+                <Card key={s.id} className="shadow-soft border-border/60">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{s.storyId}</span>
+                          <span>{s.title}</span>
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1.5">{s.businessValue}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
+                        <Badge variant="secondary" className="font-mono">{s.complexityPoints} pts</Badge>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
+                      <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
+                      <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
+                      <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                        Acceptance Criteria (Gherkin)
+                      </p>
+                      <div className="space-y-3">
+                        {acRows.map((r) => (
+                          <div key={r.label}>
+                            <p className="text-[11px] font-semibold text-primary mb-1">{r.label}</p>
+                            <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
+{r.gherkin}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           <TabsContent value="people" className="mt-4">

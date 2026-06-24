@@ -63,7 +63,7 @@ function renderHTML(req: Requirement) {
 <p>${req.rawText}</p>
 
 <h2>Ambiguities</h2>
-<ul>${a.ambiguities.map((x) => `<li>${x}</li>`).join("") || "<li>None detected</li>"}</ul>
+<ul>${a.ambiguities.map((x) => `<li><strong>"${escapeHtml(x.term)}"</strong> — ${escapeHtml(x.reason)}</li>`).join("") || "<li>None detected</li>"}</ul>
 
 <h2>Missing Information</h2>
 <ul>${a.missingInfo.map((x) => `<li>${x}</li>`).join("") || "<li>None detected</li>"}</ul>

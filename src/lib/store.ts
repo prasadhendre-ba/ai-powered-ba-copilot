@@ -6,7 +6,6 @@ interface Settings {
   organization: string;
   defaultPriority: "High" | "Medium" | "Low";
   exportFormat: "PDF" | "DOCX" | "CSV";
-  notifications: boolean;
 }
 
 interface AppState {

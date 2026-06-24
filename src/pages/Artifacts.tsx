@@ -26,6 +26,9 @@ import {
 import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
 import { toast } from "sonner";
 import { SCORE_DIMENSIONS, type Highlight, type Requirement } from "@/lib/analyzer";
+import { RtmTab } from "@/components/artifacts/RtmTab";
+import { BrdTab } from "@/components/artifacts/BrdTab";
+import { ProcessFlowTab } from "@/components/artifacts/ProcessFlowTab";
 
 const CATEGORY_STYLE: Record<Highlight["category"], string> = {
   ambiguous: "bg-warning/25 text-warning-foreground underline decoration-warning decoration-wavy",
@@ -362,11 +365,14 @@ export default function Artifacts() {
 
         {/* Tabs */}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl">
+          <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1">
             <TabsTrigger value="analysis">Analysis</TabsTrigger>
             <TabsTrigger value="stories">User Stories</TabsTrigger>
             <TabsTrigger value="people">Stakeholders</TabsTrigger>
             <TabsTrigger value="risks">Risks</TabsTrigger>
+            <TabsTrigger value="rtm">RTM</TabsTrigger>
+            <TabsTrigger value="brd">BRD</TabsTrigger>
+            <TabsTrigger value="flow">Process Flow</TabsTrigger>
           </TabsList>
 
           <TabsContent value="analysis" className="space-y-4 mt-4">
@@ -602,6 +608,10 @@ export default function Artifacts() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="rtm" className="mt-4"><RtmTab req={req} /></TabsContent>
+          <TabsContent value="brd" className="mt-4"><BrdTab req={req} /></TabsContent>
+          <TabsContent value="flow" className="mt-4"><ProcessFlowTab req={req} /></TabsContent>
         </Tabs>
       </div>
     </div>

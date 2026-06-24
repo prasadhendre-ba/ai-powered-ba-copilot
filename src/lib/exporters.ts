@@ -215,13 +215,15 @@ export function exportRtmPdf(req: Requirement, report: RtmReport) {
     <td>${escapeHtml(r.priority)}</td>
     <td>${escapeHtml(r.status)}</td>
   </tr>`).join("");
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — RTM</title><style>${SHARED_CSS}</style></head><body>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — RTM — ${BRAND.name}</title><style>${SHARED_CSS}</style></head><body>
+  ${brandHeader()}
   <div class="cover"><p class="doc-type">Requirement Traceability Matrix</p><h1>${escapeHtml(req.title)}</h1>
   <p>Generated ${new Date().toLocaleDateString()} · Coverage <strong>${report.coverage}%</strong> · ${report.rows.length} mappings</p></div>
   <table><tr><th>Req ID</th><th>Requirement</th><th>Story ID</th><th>AC ID</th><th>Risk ID</th><th>Stakeholder</th><th>Priority</th><th>Status</th></tr>${rows}</table>
   <h2>Orphans</h2>
   <p><strong>Orphan Stories:</strong> ${report.orphanStories.join(", ") || "None"}</p>
   <p><strong>Orphan Requirements:</strong> ${report.orphanRequirements.join(", ") || "None"}</p>
+  ${brandFooter()}
   </body></html>`;
   openPrintWindow(html);
 }

@@ -433,46 +433,60 @@ export default function Artifacts() {
           </TabsContent>
 
           <TabsContent value="stories" className="space-y-4 mt-4">
-            {a.userStories.map((s, i) => (
-              <Card key={s.id} className="shadow-soft border-border/60">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <CardTitle className="text-sm">User Story #{i + 1}</CardTitle>
-                    <Badge variant="outline" className={priorityColor[s.priority]}>
-                      {s.priority} priority
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
-                    <p>
-                      <span className="font-semibold text-primary">As a</span> {s.asA},
-                    </p>
-                    <p>
-                      <span className="font-semibold text-primary">I want</span> {s.iWant},
-                    </p>
-                    <p>
-                      <span className="font-semibold text-primary">so that</span> {s.soThat}.
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      Acceptance Criteria (Gherkin)
-                    </p>
-                    <div className="space-y-2">
-                      {s.acceptanceCriteria.map((ac, j) => (
-                        <pre
-                          key={j}
-                          className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed"
-                        >
-                          {ac}
-                        </pre>
-                      ))}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {a.userStories.length} backlog-ready stories ·{" "}
+                {a.userStories.reduce((sum, s) => sum + (s.complexityPoints ?? 0), 0)} total story points
+              </p>
+            </div>
+            {a.userStories.map((s) => {
+              const acRows: { label: string; gherkin: string }[] = [
+                { label: "Happy Path", gherkin: s.acceptanceCriteria?.happyPath ?? "" },
+                { label: "Validation Scenario", gherkin: s.acceptanceCriteria?.validation ?? "" },
+                { label: "Exception Scenario", gherkin: s.acceptanceCriteria?.exception ?? "" },
+              ];
+              return (
+                <Card key={s.id} className="shadow-soft border-border/60">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{s.storyId}</span>
+                          <span>{s.title}</span>
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1.5">{s.businessValue}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
+                        <Badge variant="secondary" className="font-mono">{s.complexityPoints} pts</Badge>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
+                      <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
+                      <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
+                      <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                        Acceptance Criteria (Gherkin)
+                      </p>
+                      <div className="space-y-3">
+                        {acRows.map((r) => (
+                          <div key={r.label}>
+                            <p className="text-[11px] font-semibold text-primary mb-1">{r.label}</p>
+                            <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
+{r.gherkin}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </TabsContent>
 
           <TabsContent value="people" className="mt-4">

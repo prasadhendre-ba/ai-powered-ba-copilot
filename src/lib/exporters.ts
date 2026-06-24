@@ -1,11 +1,12 @@
-import { type Requirement } from "./analyzer";
+import * as XLSX from "xlsx";
+import { type Requirement, type RtmReport } from "./analyzer";
 
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
-function downloadBlob(content: string, filename: string, type: string) {
-  const blob = new Blob([content], { type });
+function downloadBlob(content: string | Blob, filename: string, type?: string) {
+  const blob = typeof content === "string" ? new Blob([content], { type }) : content;
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -20,6 +21,9 @@ const AC_LABELS: { key: "happyPath" | "validation" | "exception"; label: string 
   { key: "exception", label: "Exception" },
 ];
 
+function safeName(s: string) { return s.replace(/\s+/g, "_").replace(/[^\w-]/g, ""); }
+
+// ===================== CSV (full analysis) =====================
 export function exportCSV(req: Requirement) {
   const rows: string[][] = [];
   rows.push(["Section", "Field", "Value"]);
@@ -56,30 +60,15 @@ export function exportCSV(req: Requirement) {
   req.analysis.assumptions.forEach((a, i) => rows.push(["Assumption", `#${i + 1}`, a]));
 
   const csv = rows.map((r) => r.map((c) => `"${(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
-  downloadBlob(csv, `${req.title.replace(/\s+/g, "_")}.csv`, "text/csv");
+  downloadBlob(csv, `${safeName(req.title)}.csv`, "text/csv");
 }
 
-function renderHTML(req: Requirement) {
+// ===================== Full analysis PDF/DOCX =====================
+function renderAnalysisHTML(req: Requirement) {
   const a = req.analysis;
-  const sbRows = Object.entries(a.scoreBreakdown)
-    .map(([k, v]) => `<tr><td>${k}</td><td>${v}/10</td></tr>`)
-    .join("");
+  const sbRows = Object.entries(a.scoreBreakdown).map(([k, v]) => `<tr><td>${k}</td><td>${v}/10</td></tr>`).join("");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)}</title>
-<style>
-  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:820px;margin:40px auto;padding:0 24px;color:#1a202c;line-height:1.6}
-  h1{color:#1e40af;border-bottom:3px solid #1e40af;padding-bottom:8px}
-  h2{color:#1e40af;margin-top:32px;border-bottom:1px solid #cbd5e1;padding-bottom:4px}
-  h3{color:#1e40af;margin-top:18px}
-  .score{display:inline-block;background:#1e40af;color:#fff;padding:8px 16px;border-radius:6px;font-size:24px;font-weight:700}
-  ul{padding-left:20px} li{margin:6px 0}
-  .story{background:#f1f5f9;padding:16px;border-radius:8px;margin:12px 0;border-left:4px solid #1e40af}
-  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
-  .meta span{background:#e0e7ff;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}
-  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;white-space:pre-wrap}
-  table{width:100%;border-collapse:collapse;margin:12px 0}
-  th,td{border:1px solid #cbd5e1;padding:8px;text-align:left;font-size:14px}
-  th{background:#e0e7ff}
-</style></head><body>
+<style>${SHARED_CSS}</style></head><body>
 <h1>${escapeHtml(req.title)}</h1>
 <p>Generated ${new Date(req.createdAt).toLocaleDateString()} · Confidence ${a.confidence}%</p>
 <div class="score">Quality Score: ${a.qualityScore}/100</div>
@@ -87,32 +76,22 @@ function renderHTML(req: Requirement) {
 <h2>Score Breakdown</h2>
 <table><tr><th>Dimension</th><th>Score</th></tr>${sbRows}</table>
 
-<h3>Strengths</h3>
-<ul>${a.scoreRationale.strengths.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>—</li>"}</ul>
-<h3>Weaknesses</h3>
-<ul>${a.scoreRationale.weaknesses.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>—</li>"}</ul>
-<h3>Deductions</h3>
-<ul>${a.scoreRationale.deductions.map((d) => `<li><strong>${escapeHtml(d.dimension)}</strong> (${d.points}/10) — ${escapeHtml(d.reason)}</li>`).join("") || "<li>—</li>"}</ul>
+<h3>Strengths</h3><ul>${a.scoreRationale.strengths.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>—</li>"}</ul>
+<h3>Weaknesses</h3><ul>${a.scoreRationale.weaknesses.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>—</li>"}</ul>
 
-<h2>Original Requirement</h2>
-<p>${escapeHtml(req.rawText)}</p>
+<h2>Original Requirement</h2><p>${escapeHtml(req.rawText)}</p>
 
 <h2>Ambiguities</h2>
-<ul>${a.ambiguities.map((x) => `<li><strong>"${escapeHtml(x.term)}"</strong> — ${escapeHtml(x.reason)}</li>`).join("") || "<li>None detected</li>"}</ul>
+<ul>${a.ambiguities.map((x) => `<li><strong>"${escapeHtml(x.term)}"</strong> — ${escapeHtml(x.reason)}</li>`).join("") || "<li>None</li>"}</ul>
 
 <h2>Missing Information</h2>
-<ul>${a.missingInfo.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>None detected</li>"}</ul>
+<ul>${a.missingInfo.map((x) => `<li>${escapeHtml(x)}</li>`).join("") || "<li>None</li>"}</ul>
 
-<h2>Clarification Questions</h2>
-<ul>${a.clarificationQuestions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
-
-<h2>Improvement Suggestions</h2>
-<ul>${a.improvementSuggestions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+<h2>Clarification Questions</h2><ul>${a.clarificationQuestions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+<h2>Improvement Suggestions</h2><ul>${a.improvementSuggestions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
 
 <h2>User Stories (${a.userStories.length})</h2>
-${a.userStories
-  .map(
-    (s) => `<div class="story">
+${a.userStories.map((s) => `<div class="story">
   <strong>${escapeHtml(s.storyId)} · ${escapeHtml(s.title)}</strong>
   <div class="meta"><span>${s.priority}</span><span>${s.complexityPoints} pts</span></div>
   <em>${escapeHtml(s.businessValue)}</em><br/><br/>
@@ -121,9 +100,7 @@ ${a.userStories
   <strong>So that</strong> ${escapeHtml(s.soThat)}<br/>
   <strong>Acceptance Criteria:</strong>
   ${AC_LABELS.map(({ key, label }) => `<div><em>${label}</em><pre>${escapeHtml(s.acceptanceCriteria[key] ?? "")}</pre></div>`).join("")}
-</div>`
-  )
-  .join("")}
+</div>`).join("")}
 
 <h2>Stakeholders</h2>
 <table><tr><th>Name</th><th>Role</th><th>Interest</th><th>Influence</th></tr>
@@ -135,13 +112,31 @@ ${a.stakeholders.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(
 ${a.risks.map((r) => `<tr><td>${escapeHtml(r.description)}</td><td>${r.impact}</td><td>${r.likelihood}</td><td>${escapeHtml(r.mitigation)}</td></tr>`).join("")}
 </table>
 
-<h2>Assumptions</h2>
-<ul>${a.assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+<h2>Assumptions</h2><ul>${a.assumptions.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
 </body></html>`;
 }
 
-export function exportPDF(req: Requirement) {
-  const html = renderHTML(req);
+const SHARED_CSS = `
+  body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:880px;margin:40px auto;padding:0 24px;color:#1a202c;line-height:1.6}
+  h1{color:#1e40af;border-bottom:3px solid #1e40af;padding-bottom:8px}
+  h2{color:#1e40af;margin-top:32px;border-bottom:1px solid #cbd5e1;padding-bottom:4px}
+  h3{color:#1e40af;margin-top:18px}
+  .score{display:inline-block;background:#1e40af;color:#fff;padding:8px 16px;border-radius:6px;font-size:20px;font-weight:700}
+  ul{padding-left:20px} li{margin:6px 0}
+  .story{background:#f1f5f9;padding:16px;border-radius:8px;margin:12px 0;border-left:4px solid #1e40af}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .meta span{background:#e0e7ff;color:#1e40af;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;overflow-x:auto;font-size:13px;white-space:pre-wrap}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  th,td{border:1px solid #cbd5e1;padding:8px;text-align:left}
+  th{background:#e0e7ff}
+  .cover{text-align:center;margin:20px 0 40px}
+  .cover .doc-type{letter-spacing:.2em;text-transform:uppercase;color:#64748b;font-size:12px}
+  .traced{color:#16a34a;font-weight:600}
+  .orphan{color:#ea580c;font-weight:600}
+`;
+
+function openPrintWindow(html: string) {
   const w = window.open("", "_blank");
   if (!w) return;
   w.document.write(html);
@@ -149,8 +144,99 @@ export function exportPDF(req: Requirement) {
   setTimeout(() => w.print(), 400);
 }
 
+export function exportPDF(req: Requirement) { openPrintWindow(renderAnalysisHTML(req)); }
 export function exportDOCX(req: Requirement) {
-  const html = renderHTML(req);
+  const docxContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>${renderAnalysisHTML(req)}</html>`;
+  downloadBlob(docxContent, `${safeName(req.title)}.doc`, "application/msword");
+}
+
+// ===================== RTM =====================
+export function exportRtmExcel(req: Requirement, report: RtmReport) {
+  const wb = XLSX.utils.book_new();
+  const data: (string | number)[][] = [
+    ["Requirement ID", "Requirement Description", "User Story ID", "Acceptance Criteria ID", "Risk ID", "Stakeholder", "Priority", "Status"],
+    ...report.rows.map((r) => [r.requirementId, r.requirementDescription, r.userStoryId, r.acceptanceCriteriaId, r.riskId, r.stakeholder, r.priority, r.status]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 10 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, ws, "RTM");
+
+  const summary = [
+    ["Metric", "Value"],
+    ["Requirement", req.title],
+    ["Coverage %", report.coverage],
+    ["Total Mappings", report.rows.length],
+    ["Traced", report.rows.filter((r) => r.status === "Traced").length],
+    ["Orphan Stories", report.orphanStories.join(", ") || "—"],
+    ["Orphan Requirements", report.orphanRequirements.join(", ") || "—"],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
+
+  const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  downloadBlob(new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${safeName(req.title)}_RTM.xlsx`);
+}
+
+export function exportRtmPdf(req: Requirement, report: RtmReport) {
+  const rows = report.rows.map((r) => `<tr class="${r.status === "Traced" ? "traced" : "orphan"}">
+    <td>${escapeHtml(r.requirementId)}</td>
+    <td>${escapeHtml(r.requirementDescription)}</td>
+    <td>${escapeHtml(r.userStoryId)}</td>
+    <td>${escapeHtml(r.acceptanceCriteriaId)}</td>
+    <td>${escapeHtml(r.riskId)}</td>
+    <td>${escapeHtml(r.stakeholder)}</td>
+    <td>${escapeHtml(r.priority)}</td>
+    <td>${escapeHtml(r.status)}</td>
+  </tr>`).join("");
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — RTM</title><style>${SHARED_CSS}</style></head><body>
+  <div class="cover"><p class="doc-type">Requirement Traceability Matrix</p><h1>${escapeHtml(req.title)}</h1>
+  <p>Generated ${new Date().toLocaleDateString()} · Coverage <strong>${report.coverage}%</strong> · ${report.rows.length} mappings</p></div>
+  <table><tr><th>Req ID</th><th>Requirement</th><th>Story ID</th><th>AC ID</th><th>Risk ID</th><th>Stakeholder</th><th>Priority</th><th>Status</th></tr>${rows}</table>
+  <h2>Orphans</h2>
+  <p><strong>Orphan Stories:</strong> ${report.orphanStories.join(", ") || "None"}</p>
+  <p><strong>Orphan Requirements:</strong> ${report.orphanRequirements.join(", ") || "None"}</p>
+  </body></html>`;
+  openPrintWindow(html);
+}
+
+// ===================== BRD =====================
+function renderBrdHTML(req: Requirement) {
+  const a = req.analysis;
+  const b = a.brd;
+  const ul = (items: string[]) => items?.length ? `<ul>${items.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>` : `<p><em>Not specified.</em></p>`;
+  const sect = (n: number, t: string, body: string) => `<h2>${n}. ${t}</h2>${body}`;
+  const reqRows = a.userStories.map((s) => `<tr>
+    <td>BR-${s.storyId.replace("US-", "")}</td>
+    <td><strong>${escapeHtml(s.title)}</strong><br/><span style="color:#64748b;font-size:12px">As a ${escapeHtml(s.asA)}, I want ${escapeHtml(s.iWant)}, so that ${escapeHtml(s.soThat)}.</span></td>
+    <td>${s.priority}</td>
+  </tr>`).join("");
+  const riskRows = a.risks.map((r, i) => `<tr><td>RISK-${String(i + 1).padStart(3, "0")}</td><td>${escapeHtml(r.description)}</td><td>${r.impact}</td><td>${r.likelihood}</td><td>${escapeHtml(r.mitigation)}</td></tr>`).join("");
+  const stkRows = a.stakeholders.map((s) => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.role)}</td><td>${s.interest}</td><td>${s.influence}</td></tr>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(req.title)} — BRD</title><style>${SHARED_CSS}</style></head><body>
+  <div class="cover"><p class="doc-type">Business Requirements Document</p><h1>${escapeHtml(req.title)}</h1>
+  <p>Doc ID: BRD-${req.id.toUpperCase()} · ${new Date(req.createdAt).toLocaleDateString()} · Confidence ${a.confidence}%</p></div>
+
+  ${sect(1, "Executive Summary", `<p>${escapeHtml(b.executiveSummary)}</p>`)}
+  ${sect(2, "Business Objective", `<p>${escapeHtml(b.businessObjective)}</p>`)}
+  ${sect(3, "Problem Statement", `<p>${escapeHtml(b.problemStatement)}</p>`)}
+  ${sect(4, "Current State", `<p>${escapeHtml(b.currentState)}</p>`)}
+  ${sect(5, "Future State", `<p>${escapeHtml(b.futureState)}</p>`)}
+  ${sect(6, "In Scope", ul(b.inScope))}
+  ${sect(7, "Out of Scope", ul(b.outOfScope))}
+  ${sect(8, "Stakeholders", `<table><tr><th>Name</th><th>Role</th><th>Interest</th><th>Influence</th></tr>${stkRows}</table>`)}
+  ${sect(9, "Assumptions", ul(a.assumptions))}
+  ${sect(10, "Constraints", ul(b.constraints))}
+  ${sect(11, "Business Requirements", `<table><tr><th>ID</th><th>Requirement</th><th>Priority</th></tr>${reqRows}</table>`)}
+  ${sect(12, "Business Rules", ul(b.businessRules))}
+  ${sect(13, "Risks", `<table><tr><th>ID</th><th>Description</th><th>Impact</th><th>Likelihood</th><th>Mitigation</th></tr>${riskRows}</table>`)}
+  ${sect(14, "Dependencies", ul(b.dependencies))}
+  ${sect(15, "Success Metrics", ul(b.successMetrics))}
+  </body></html>`;
+}
+
+export function exportBrdPdf(req: Requirement) { openPrintWindow(renderBrdHTML(req)); }
+export function exportBrdDocx(req: Requirement) {
+  const html = renderBrdHTML(req);
   const docxContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>${html}</html>`;
-  downloadBlob(docxContent, `${req.title.replace(/\s+/g, "_")}.doc`, "application/msword");
+  downloadBlob(docxContent, `${safeName(req.title)}_BRD.doc`, "application/msword");
 }

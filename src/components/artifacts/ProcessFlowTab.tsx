@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Image as ImageIcon, Printer, Users, Activity, GitBranch, Cpu, Link2, Flag, AlertTriangle, Shuffle, PlayCircle, StopCircle } from "lucide-react";
+import {
+  Download, Image as ImageIcon, Printer, Users, Activity, GitBranch, Cpu, Link2,
+  AlertTriangle, Shuffle, PlayCircle, StopCircle, HelpCircle, CheckCircle2, XCircle, ArrowRight,
+} from "lucide-react";
 import { MermaidDiagram, renderMermaidSvg } from "@/components/MermaidDiagram";
 import type { Requirement, ActivityDiagram } from "@/lib/analyzer";
 import { toast } from "sonner";
@@ -34,11 +36,8 @@ async function exportPng(chart: string, filename: string) {
       canvas.toBlob((b) => {
         if (!b) return reject(new Error("PNG failed"));
         const a = document.createElement("a");
-        a.href = URL.createObjectURL(b);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        resolve();
+        a.href = URL.createObjectURL(b); a.download = filename; a.click();
+        URL.revokeObjectURL(url); resolve();
       }, "image/png");
     };
     img.onerror = reject;
@@ -46,13 +45,19 @@ async function exportPng(chart: string, filename: string) {
   });
 }
 
-async function exportPdf(chart: string, title: string, label: string) {
-  const svg = await renderMermaidSvg(chart);
+async function exportPdf(chart: string, title: string, narrative: string[]) {
+  let svg = "";
+  try { svg = await renderMermaidSvg(chart); } catch { /* fall back to narrative-only */ }
   const w = window.open("", "_blank");
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — ${label}</title>
-  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:40px;color:#1a202c}h1{color:#1e40af;border-bottom:3px solid #1e40af;padding-bottom:8px}svg{max-width:100%;height:auto}</style>
-  </head><body><h1>${title} — ${label}</h1>${svg}</body></html>`);
+  const narrHtml = narrative.map((l) => `<div style="font-family:ui-monospace,monospace;font-size:12px;padding:2px 0">${l.replace(/</g, "&lt;")}</div>`).join("");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} — UML Activity Diagram</title>
+  <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:40px;color:#1a202c}h1{color:#1e40af;border-bottom:3px solid #1e40af;padding-bottom:8px}h2{color:#1e40af;margin-top:32px}svg{max-width:100%;height:auto}</style>
+  </head><body>
+  <h1>${title} — UML Activity Diagram</h1>
+  <h2>Activity Flow Narrative</h2>${narrHtml}
+  ${svg ? `<h2>Diagram</h2>${svg}` : ""}
+  </body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 500);
 }
@@ -71,51 +76,152 @@ function Chip({ icon: Icon, label, items, tone }: { icon: typeof Users; label: s
   );
 }
 
-function TextActivityFlow({ steps }: { steps: string[] }) {
-  if (!steps?.length) return <p className="text-sm text-muted-foreground">No textual activity flow available.</p>;
-  const tone = (s: string) => {
-    const u = s.toUpperCase();
-    if (u.includes("[START]")) return "text-primary border-primary/30 bg-primary/5";
-    if (u.includes("[END")) return "text-success border-success/30 bg-success/5";
-    if (u.includes("[DECISION") || u.includes("[VALIDATION")) return "text-warning border-warning/30 bg-warning/5";
-    if (u.includes("[EXCEPTION")) return "text-destructive border-destructive/30 bg-destructive/5";
-    if (u.includes("[INTEGRATION")) return "text-blue-600 border-blue-300 bg-blue-50";
-    if (u.includes("[SYSTEM")) return "text-foreground border-border bg-muted/40";
-    if (u.includes("[ACTOR")) return "text-foreground border-border bg-secondary";
-    return "text-foreground border-border bg-card";
-  };
-  return (
-    <ol className="space-y-1.5">
-      {steps.map((s, i) => (
-        <li key={i} className="flex gap-2 items-start">
-          <span className="font-mono text-[11px] text-muted-foreground shrink-0 w-7 pt-1.5">{String(i + 1).padStart(2, "0")}</span>
-          <span className={`text-sm px-2.5 py-1.5 rounded-md border flex-1 ${tone(s)}`}>{s}</span>
-        </li>
-      ))}
-    </ol>
-  );
+/** Render the structured Start / → step / Decision: / Yes / No / End narrative. */
+function NarrativeView({ narrative }: { narrative: string[] }) {
+  if (!narrative?.length) {
+    return <p className="text-sm text-muted-foreground">No narrative available.</p>;
+  }
+  const out: JSX.Element[] = [];
+  let branchDepth = 0; // 0 = root, 1 = inside Yes/No branch
+  for (let i = 0; i < narrative.length; i++) {
+    const raw = narrative[i] ?? "";
+    const line = raw.trim();
+    if (!line) continue;
+    const indent = { paddingLeft: `${branchDepth * 20}px` };
+
+    if (/^start$/i.test(line)) {
+      out.push(
+        <div key={i} style={indent} className="flex items-center gap-2 py-1.5">
+          <PlayCircle className="h-4 w-4 text-primary" />
+          <span className="text-sm font-semibold text-primary tracking-wide">START</span>
+        </div>
+      );
+      branchDepth = 0;
+      continue;
+    }
+    if (/^end(\b|:)/i.test(line)) {
+      const label = line.replace(/^end[:\s-]*/i, "").trim();
+      out.push(
+        <div key={i} style={indent} className="flex items-center gap-2 py-1.5">
+          <StopCircle className="h-4 w-4 text-success" />
+          <span className="text-sm font-semibold text-success tracking-wide">END{label ? ` — ${label}` : ""}</span>
+        </div>
+      );
+      continue;
+    }
+    if (/^decision:?\s*$/i.test(line)) {
+      // next non-empty line is the question
+      const q = (narrative[i + 1] ?? "").trim();
+      out.push(
+        <div key={i} style={indent} className="mt-3 mb-1">
+          <div className="flex items-start gap-2 p-2.5 rounded-md border border-warning/30 bg-warning/5">
+            <GitBranch className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-warning">Decision</p>
+              <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                <HelpCircle className="h-3.5 w-3.5 text-warning" /> {q || "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+      i += 1; // consume question line
+      branchDepth = 0;
+      continue;
+    }
+    if (/^yes$/i.test(line)) {
+      out.push(
+        <div key={i} style={indent} className="flex items-center gap-1.5 mt-1.5">
+          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-success">Yes</span>
+        </div>
+      );
+      branchDepth = 1;
+      continue;
+    }
+    if (/^no$/i.test(line)) {
+      out.push(
+        <div key={i} style={indent} className="flex items-center gap-1.5 mt-1.5">
+          <XCircle className="h-3.5 w-3.5 text-destructive" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-destructive">No</span>
+        </div>
+      );
+      branchDepth = 1;
+      continue;
+    }
+    // Activity step (with or without leading →)
+    const text = line.replace(/^→\s*/, "").replace(/^->\s*/, "");
+    out.push(
+      <div key={i} style={indent} className="flex items-start gap-2 py-0.5">
+        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-1 shrink-0" />
+        <span className="text-sm text-foreground">{text}</span>
+      </div>
+    );
+  }
+  return <div className="space-y-0.5">{out}</div>;
 }
 
-function ActivityDiagramView({ ad, title, reqId }: { ad: ActivityDiagram; title: string; reqId: string }) {
-  const filenameBase = `${title.replace(/\s+/g, "_")}_activity_diagram`;
+/** Build narrative from structured fields when AI didn't supply one. */
+function deriveNarrative(ad: ActivityDiagram): string[] {
+  if (ad.narrative?.length) return ad.narrative;
+  const out: string[] = ["Start"];
+  (ad.activities ?? []).slice(0, 3).forEach((a) => out.push(`→ ${a}`));
+  (ad.decisions ?? []).forEach((d) => {
+    out.push("Decision:", d.question);
+    out.push("No", `→ ${d.noPath}`);
+    out.push("Yes", `→ ${d.yesPath}`);
+  });
+  (ad.endNodes ?? []).forEach((e) => out.push(`End — ${e}`));
+  if (out[out.length - 1] !== "End" && !out[out.length - 1].toLowerCase().startsWith("end")) out.push("End");
+  return out;
+}
+
+export function ProcessFlowTab({ req }: { req: Requirement }) {
+  const ad = req.analysis.processFlow.activityDiagram;
+  const narrative = deriveNarrative(ad);
+  const filenameBase = `${req.title.replace(/\s+/g, "_")}_activity_diagram`;
+
   return (
     <div className="space-y-4">
       <Card className="shadow-soft border-border/60">
         <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">UML Activity Diagram</p>
-            <p className="text-xs text-muted-foreground">Derived from your requirement · includes validation, approval, exception and integration branches</p>
+            <p className="text-xs text-muted-foreground">
+              Narrative-first BA artifact derived from your requirement · decisions, alternate &amp; exception paths, actor vs system actions
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => exportPng(ad.mermaid, `${filenameBase}.png`).then(() => toast.success("PNG downloaded")).catch((e) => toast.error(String(e)))}>
+            <Button size="sm" variant="outline"
+              onClick={() => exportPng(ad.mermaid, `${filenameBase}.png`)
+                .then(() => toast.success("PNG downloaded"))
+                .catch(() => toast.error("Diagram render failed — use PDF export for the narrative"))}>
               <ImageIcon className="h-4 w-4 mr-2" /> PNG
             </Button>
-            <Button size="sm" variant="outline" onClick={() => exportPdf(ad.mermaid, title, "UML Activity Diagram").then(() => toast.success("PDF view opened")).catch((e) => toast.error(String(e)))}>
+            <Button size="sm" variant="outline"
+              onClick={() => exportPdf(ad.mermaid, req.title, narrative)
+                .then(() => toast.success("PDF view opened"))
+                .catch((e) => toast.error(String(e)))}>
               <Printer className="h-4 w-4 mr-2" /> PDF
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => { downloadString(ad.mermaid, `${filenameBase}.mmd`, "text/plain"); toast.success("Mermaid source downloaded"); }}>
-              <Download className="h-4 w-4 mr-2" /> .mmd
+            <Button size="sm" variant="ghost"
+              onClick={() => { downloadString(narrative.join("\n"), `${filenameBase}_narrative.txt`, "text/plain"); toast.success("Narrative downloaded"); }}>
+              <Download className="h-4 w-4 mr-2" /> Narrative .txt
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-soft border-border/60">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" /> Activity Flow Narrative
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Primary deliverable — traceable to the original requirement.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <NarrativeView narrative={narrative} />
           </div>
         </CardContent>
       </Card>
@@ -125,115 +231,14 @@ function ActivityDiagramView({ ad, title, reqId }: { ad: ActivityDiagram; title:
         <CardContent>
           <MermaidDiagram
             chart={ad.mermaid}
-            id={`activity-${reqId}`}
-            fallback={<TextActivityFlow steps={ad.textActivityFlow} />}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm">Text Activity Flow</CardTitle></CardHeader>
-          <CardContent><TextActivityFlow steps={ad.textActivityFlow} /></CardContent>
-        </Card>
-
-        <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm">Activity Elements</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-3 text-xs">
-              <Badge variant="outline" className="border-primary/40 text-primary"><PlayCircle className="h-3 w-3 mr-1" /> Start: {ad.startNode || "Start"}</Badge>
-              {ad.endNodes?.map((e, i) => (
-                <Badge key={i} variant="outline" className="border-success/40 text-success"><StopCircle className="h-3 w-3 mr-1" /> End: {e}</Badge>
-              ))}
-            </div>
-            <Chip icon={Activity} label="Activities" items={ad.activities} tone="text-foreground" />
-            <Chip icon={Cpu} label="System Actions" items={ad.systemActions} tone="text-primary" />
-            <Chip icon={Link2} label="Integration Points" items={ad.integrationPoints} tone="text-blue-600" />
-            <Chip icon={Shuffle} label="Alternate Paths" items={ad.alternatePaths} tone="text-warning" />
-            <Chip icon={AlertTriangle} label="Exception Paths" items={ad.exceptionPaths} tone="text-destructive" />
-          </CardContent>
-        </Card>
-      </div>
-
-      {ad.actorActions?.length > 0 && (
-        <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Actor Responsibilities</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {ad.actorActions.map((a, i) => (
-                <div key={i} className="text-sm p-2.5 rounded-md border border-border bg-muted/30">
-                  <Badge variant="outline" className="mr-2 text-[10px]">{a.actor}</Badge>
-                  <span className="text-foreground">{a.action}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {ad.decisions?.length > 0 && (
-        <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary" /> Decisions, Validations & Approvals</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {ad.decisions.map((d, i) => (
-                <div key={i} className="p-3 rounded-lg border border-border bg-muted/30">
-                  <p className="text-sm font-semibold text-foreground">{d.question}</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm">
-                    <div className="flex gap-2"><Badge className="bg-success/10 text-success border-success/30" variant="outline">Yes / Approved</Badge><span className="text-muted-foreground">→ {d.yesPath}</span></div>
-                    <div className="flex gap-2"><Badge className="bg-destructive/10 text-destructive border-destructive/30" variant="outline">No / Rejected</Badge><span className="text-muted-foreground">→ {d.noPath}</span></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function BusinessProcessView({ pf, title, reqId }: { pf: Requirement["analysis"]["processFlow"]; title: string; reqId: string }) {
-  const filenameBase = `${title.replace(/\s+/g, "_")}_business_flow`;
-  return (
-    <div className="space-y-4">
-      <Card className="shadow-soft border-border/60">
-        <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold">Business Process Flow</p>
-            <p className="text-xs text-muted-foreground">High-level end-to-end business process · Mermaid flowchart</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => exportPng(pf.mermaid, `${filenameBase}.png`).then(() => toast.success("PNG downloaded")).catch((e) => toast.error(String(e)))}>
-              <ImageIcon className="h-4 w-4 mr-2" /> PNG
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => exportPdf(pf.mermaid, title, "Business Process Flow").then(() => toast.success("PDF view opened")).catch((e) => toast.error(String(e)))}>
-              <Printer className="h-4 w-4 mr-2" /> PDF
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => { downloadString(pf.mermaid, `${filenameBase}.mmd`, "text/plain"); toast.success("Mermaid source downloaded"); }}>
-              <Download className="h-4 w-4 mr-2" /> .mmd
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-soft border-border/60">
-        <CardHeader className="pb-3"><CardTitle className="text-sm">Visual Process Diagram</CardTitle></CardHeader>
-        <CardContent>
-          <MermaidDiagram
-            chart={pf.mermaid}
-            id={`flow-${reqId}`}
+            id={`activity-${req.id}`}
             fallback={
-              pf.textFlow?.length ? (
-                <ol className="space-y-2">
-                  {pf.textFlow.map((step, i) => (
-                    <li key={i} className="text-sm flex gap-3">
-                      <span className="font-mono text-xs text-primary shrink-0 w-6">{String(i + 1).padStart(2, "0")}</span>
-                      <span>{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              ) : <p className="text-sm text-muted-foreground">No text flow available.</p>
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Diagram could not render — the narrative above is the authoritative artifact.
+                </p>
+                <NarrativeView narrative={narrative} />
+              </div>
             }
           />
         </CardContent>
@@ -241,46 +246,79 @@ function BusinessProcessView({ pf, title, reqId }: { pf: Requirement["analysis"]
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm">Text-based Process Flow</CardTitle></CardHeader>
-          <CardContent>
-            {pf.textFlow?.length ? (
-              <ol className="space-y-2">
-                {pf.textFlow.map((step, i) => (
-                  <li key={i} className="text-sm text-foreground flex gap-3">
-                    <span className="font-mono text-xs text-primary shrink-0 w-6">{String(i + 1).padStart(2, "0")}</span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            ) : <p className="text-sm text-muted-foreground">No text flow available.</p>}
+          <CardHeader className="pb-3"><CardTitle className="text-sm">Activity Elements</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline" className="border-primary/40 text-primary">
+                <PlayCircle className="h-3 w-3 mr-1" /> Start: {ad.startNode || "Start"}
+              </Badge>
+              {(ad.endNodes ?? []).map((e, i) => (
+                <Badge key={i} variant="outline" className="border-success/40 text-success">
+                  <StopCircle className="h-3 w-3 mr-1" /> End: {e}
+                </Badge>
+              ))}
+            </div>
+            <Chip icon={Activity} label="Activities" items={ad.activities} tone="text-foreground" />
+            <Chip icon={Cpu} label="System Actions" items={ad.systemActions} tone="text-primary" />
+            <Chip icon={Link2} label="Integration Activities" items={ad.integrationPoints} tone="text-blue-600" />
+            <Chip icon={Shuffle} label="Alternate Flows" items={ad.alternatePaths} tone="text-warning" />
+            <Chip icon={AlertTriangle} label="Exception Flows" items={ad.exceptionPaths} tone="text-destructive" />
           </CardContent>
         </Card>
 
         <Card className="shadow-soft border-border/60">
-          <CardHeader className="pb-3"><CardTitle className="text-sm">Process Elements</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <Chip icon={Users} label="Actors" items={pf.actors} tone="text-primary" />
-            <Chip icon={Activity} label="Activities" items={pf.activities} tone="text-foreground" />
-            <Chip icon={Cpu} label="System Actions" items={pf.systemActions} tone="text-primary" />
-            <Chip icon={Link2} label="Integrations" items={pf.integrations} tone="text-warning" />
-            <Chip icon={Flag} label="End States" items={pf.endStates} tone="text-success" />
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Actor vs System Responsibilities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ad.actorActions?.length ? (
+              <div className="space-y-2">
+                {ad.actorActions.map((a, i) => (
+                  <div key={i} className="text-sm p-2.5 rounded-md border border-border bg-muted/30">
+                    <Badge variant="outline" className="mr-2 text-[10px]">{a.actor}</Badge>
+                    <span className="text-foreground">{a.action}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-sm text-muted-foreground">No actor actions identified.</p>}
+            {ad.systemActions?.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider mb-2 text-primary flex items-center gap-1.5">
+                  <Cpu className="h-3 w-3" /> System
+                </p>
+                <div className="space-y-1.5">
+                  {ad.systemActions.map((s, i) => (
+                    <div key={i} className="text-sm p-2 rounded-md border border-border bg-primary/5">
+                      <Badge variant="outline" className="mr-2 text-[10px] border-primary/40 text-primary">System</Badge>
+                      {s}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {pf.decisionPoints?.length > 0 && (
+      {ad.decisions?.length > 0 && (
         <Card className="shadow-soft border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary" /> Decision Points</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2"><GitBranch className="h-4 w-4 text-primary" /> Decisions, Validations &amp; Approvals</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {pf.decisionPoints.map((d, i) => (
+              {ad.decisions.map((d, i) => (
                 <div key={i} className="p-3 rounded-lg border border-border bg-muted/30">
                   <p className="text-sm font-semibold text-foreground">{d.question}</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-sm">
-                    <div className="flex gap-2"><Badge className="bg-success/10 text-success border-success/30" variant="outline">Yes</Badge><span className="text-muted-foreground">→ {d.yesPath}</span></div>
-                    <div className="flex gap-2"><Badge className="bg-destructive/10 text-destructive border-destructive/30" variant="outline">No</Badge><span className="text-muted-foreground">→ {d.noPath}</span></div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-success/10 text-success border-success/30" variant="outline">Yes / Approved</Badge>
+                      <span className="text-muted-foreground">→ {d.yesPath}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className="bg-destructive/10 text-destructive border-destructive/30" variant="outline">No / Rejected</Badge>
+                      <span className="text-muted-foreground">→ {d.noPath}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -289,24 +327,5 @@ function BusinessProcessView({ pf, title, reqId }: { pf: Requirement["analysis"]
         </Card>
       )}
     </div>
-  );
-}
-
-export function ProcessFlowTab({ req }: { req: Requirement }) {
-  const pf = req.analysis.processFlow;
-  const ad = pf.activityDiagram;
-  return (
-    <Tabs defaultValue="business" className="w-full">
-      <TabsList className="grid w-full max-w-md grid-cols-2">
-        <TabsTrigger value="business">Business Process Flow</TabsTrigger>
-        <TabsTrigger value="activity">UML Activity Diagram</TabsTrigger>
-      </TabsList>
-      <TabsContent value="business" className="mt-4">
-        <BusinessProcessView pf={pf} title={req.title} reqId={req.id} />
-      </TabsContent>
-      <TabsContent value="activity" className="mt-4">
-        <ActivityDiagramView ad={ad} title={req.title} reqId={req.id} />
-      </TabsContent>
-    </Tabs>
   );
 }

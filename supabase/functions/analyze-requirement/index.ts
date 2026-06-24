@@ -50,27 +50,47 @@ Produce a processFlow object with TWO complementary views of the end-to-end busi
 - textFlow: ordered array of step strings forming a readable narrative (arrows implied)
 - mermaid: a complete valid Mermaid \`flowchart TD\` diagram of the business process. Use () for start, [] for actions, {} for decisions, (()) for end states. Use -->|Yes|/|No| labels on decisions. Node IDs must be short alphanumeric. NO code fences.
 
-2) activityDiagram — a proper UML Activity Diagram derived from the SAME requirement, more granular than the business flow. Must explicitly model:
+2) activityDiagram — a proper UML Activity Diagram derived from the SAME requirement. The NARRATIVE is the primary deliverable; the visual diagram is secondary. Both must reflect the same flow.
    - startNode: label for the initial node (typically "Start")
    - endNodes: array of final/terminal node labels (success AND failure outcomes)
    - activities: ordered list of activity labels (verb-object), including BOTH actor actions and system actions
    - decisions: array of { question, yesPath, noPath } — every validation branch, approval/rejection branch, and conditional path
    - alternatePaths: array of alternate-flow descriptions (e.g. "User chooses social login instead of email")
    - exceptionPaths: array of exception/error scenario descriptions (e.g. "Payment gateway timeout → retry then refund")
-   - actorActions: array of { actor, action } pairs assigning responsibility (e.g. {actor:"Customer", action:"Submit KYC documents"})
+   - actorActions: array of { actor, action } pairs assigning responsibility
    - systemActions: array of automated/system-performed actions
-   - integrationPoints: array of integration touchpoints (named external systems with the action, e.g. "CIBIL — fetch credit score")
-   - textActivityFlow: an ordered, numbered textual UML activity flow that a BA can paste into a document. Use prefixes like "[Start]", "[Activity]", "[Decision]", "[Validation]", "[Exception]", "[Integration]", "[Actor: X]", "[System]", "[Merge]", "[End: <outcome>]". One step per array entry.
-   - mermaid: a complete valid Mermaid diagram of the UML activity diagram. Use \`flowchart TD\` syntax (preferred for broad compatibility). Conventions:
-       * Start: \`Start(([Start]))\`
+   - integrationPoints: array of integration touchpoints (e.g. "CIBIL — fetch credit score")
+   - narrative: REQUIRED. An ordered array of short strings representing the full activity flow in this EXACT format (one element per line). Use these line types verbatim:
+       * "Start" — first element
+       * "→ <verb phrase>" — an activity step (prefix is the arrow character → followed by a space)
+       * "Decision:" — opens a decision block (next element MUST be the question text without any prefix)
+       * "<Question text ending with ?>" — immediately follows "Decision:"
+       * "No" or "Yes" — branch label on its own line, followed by the "→ <step>" elements for that branch
+       * "End" — terminal node (may appear multiple times for different end states)
+     Example (loan application):
+       ["Start",
+        "→ Customer enters application details",
+        "→ Customer uploads documents",
+        "→ System validates information",
+        "Decision:", "Are mandatory fields complete?",
+        "No", "→ Display validation errors", "→ Return to application entry",
+        "Yes", "→ Continue processing",
+        "Decision:", "Eligible for loan?",
+        "No", "→ Reject application", "→ Notify customer", "End",
+        "Yes", "→ Generate offer", "→ Loan officer review",
+        "Decision:", "Approved?",
+        "No", "→ Reject application", "→ Notify customer", "End",
+        "Yes", "→ Disburse loan", "→ Notify customer", "End"]
+     Use the same shape for the user's actual requirement — DO NOT copy the loan example. Every line must trace to the requirement text.
+   - textActivityFlow: a secondary, tagged version of the same flow using prefixes "[Start]", "[Activity]", "[Decision]", "[Validation]", "[Exception]", "[Integration]", "[Actor: X]", "[System]", "[End: <outcome>]". One step per array entry.
+   - mermaid: a syntactically VALID Mermaid \`flowchart TD\` diagram of the activity diagram. Keep it simple and safe:
+       * Start: \`Start((Start))\`
        * Activities: \`A1[Submit Application]\`
        * Decisions: \`D1{Is application valid?}\` with branches \`-->|Yes| ...\` / \`-->|No| ...\`
-       * Validation/exception branches must be explicit, including rejoin/merge nodes where applicable
-       * Integration calls: \`I1[/Call CIBIL API/]\` (parallelogram shape) or labeled clearly
-       * System actions vs actor actions: prefix label with actor in parentheses, e.g. \`A2[(Customer) Upload Documents]\` or \`S1[(System) Generate Reference Number]\`
-       * End nodes: \`E1(((Approved)))\`, \`E2(((Rejected)))\`, \`E3(((Cancelled)))\`
-       * Node IDs short alphanumeric. NO markdown code fences. Must start with \`flowchart TD\`.
-   The mermaid MUST be syntactically valid (balanced brackets, no stray characters, every node referenced is defined). If a textActivityFlow step has no diagram equivalent, still keep both consistent.
+       * End nodes: \`E1((Approved))\`, \`E2((Rejected))\`
+       * Node IDs must be short alphanumeric. NO markdown code fences. NO parentheses or quotes inside node labels — use plain words only. Every referenced node must be defined.
+     If you are not confident the mermaid is valid, output the minimal diagram \`flowchart TD\\n  Start((Start)) --> End((End))\` — the narrative is what matters.
+
 
 
 === OTHER OUTPUTS ===
@@ -304,9 +324,10 @@ const analysisTool = {
                 systemActions: { type: "array", items: { type: "string" } },
                 integrationPoints: { type: "array", items: { type: "string" } },
                 textActivityFlow: { type: "array", items: { type: "string" } },
-                mermaid: { type: "string", description: "Raw mermaid source for the UML Activity Diagram, no code fences. Must start with 'flowchart TD'." },
+                narrative: { type: "array", items: { type: "string" }, description: "Ordered narrative using Start / → step / Decision: / question / Yes|No / End line types." },
+                mermaid: { type: "string", description: "Raw mermaid 'flowchart TD' source, no code fences. Must be syntactically valid." },
               },
-              required: ["startNode","endNodes","activities","decisions","alternatePaths","exceptionPaths","actorActions","systemActions","integrationPoints","textActivityFlow","mermaid"],
+              required: ["startNode","endNodes","activities","decisions","alternatePaths","exceptionPaths","actorActions","systemActions","integrationPoints","textActivityFlow","narrative","mermaid"],
             },
           },
           required: ["actors","activities","decisionPoints","systemActions","integrations","endStates","textFlow","mermaid","activityDiagram"],

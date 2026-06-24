@@ -83,6 +83,9 @@ export interface ActivityDiagram {
   systemActions: string[];
   integrationPoints: string[];
   textActivityFlow: string[];
+  /** Primary BA-facing narrative. Each entry is a single line in the
+   *  Start / → activity / Decision: / Yes / No / End format. */
+  narrative: string[];
   mermaid: string;
 }
 
@@ -193,6 +196,7 @@ const EMPTY_ACTIVITY: ActivityDiagram = {
   systemActions: [],
   integrationPoints: [],
   textActivityFlow: [],
+  narrative: [],
   mermaid: "flowchart TD\n  Start((Start)) --> A[Activity]\n  A --> End((End))",
 };
 

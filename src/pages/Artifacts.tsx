@@ -240,15 +240,13 @@ export default function Artifacts() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Gauge className="h-4 w-4 text-primary" /> Quality Breakdown
+                <Badge variant="secondary" className="ml-auto text-[11px]">{a.qualityScore}/100</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-              <ScoreBar label="Clarity" value={a.scoreBreakdown.clarity} />
-              <ScoreBar label="Completeness" value={a.scoreBreakdown.completeness} />
-              <ScoreBar label="Consistency" value={a.scoreBreakdown.consistency} />
-              <ScoreBar label="Testability" value={a.scoreBreakdown.testability} />
-              <ScoreBar label="Business Context" value={a.scoreBreakdown.businessContext} />
-              <ScoreBar label="Functional Detail" value={a.scoreBreakdown.missingFunctionalDetails} />
+              {SCORE_DIMENSIONS.map((d) => (
+                <ScoreBar key={d.key} label={d.label} value={a.scoreBreakdown[d.key]} max={10} />
+              ))}
             </CardContent>
           </Card>
 

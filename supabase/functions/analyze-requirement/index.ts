@@ -150,7 +150,7 @@ const analysisTool = {
               title: { type: "string" },
               priority: { type: "string", enum: ["High", "Medium", "Low"] },
               businessValue: { type: "string" },
-              complexityPoints: { type: "integer", enum: [1, 2, 3, 5, 8, 13] },
+              complexityPoints: { type: "integer", minimum: 1, maximum: 13, description: "Fibonacci: 1, 2, 3, 5, 8, or 13" },
               asA: { type: "string" },
               iWant: { type: "string" },
               soThat: { type: "string" },

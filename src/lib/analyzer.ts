@@ -256,7 +256,11 @@ export function normalizeAnalysis(raw: RawAiAnalysis): Analysis {
     assumptions: raw.assumptions ?? [],
     highlights: raw.highlights ?? [],
     brd: { ...EMPTY_BRD, ...(raw.brd ?? {}) },
-    processFlow: { ...EMPTY_FLOW, ...(raw.processFlow ?? {}) },
+    processFlow: {
+      ...EMPTY_FLOW,
+      ...(raw.processFlow ?? {}),
+      activityDiagram: { ...EMPTY_ACTIVITY, ...(raw.processFlow?.activityDiagram ?? {}) },
+    },
   };
 }
 

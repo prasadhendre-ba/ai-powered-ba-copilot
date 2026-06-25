@@ -11,100 +11,51 @@ const SYSTEM_PROMPT = `You are a Senior Business Analyst with 15+ years of enter
 
 Analyze the requirement EXACTLY as written. Reference specific words, phrases, actors, processes, workflows, business rules, validations, integrations and edge cases present in the text. Every ambiguity, risk, question, score deduction, user story, BRD section and process step MUST be traceable to the requirement text.
 
+=== REQUIREMENT DECOMPOSITION (MANDATORY) ===
+FIRST, decompose the stakeholder input into atomic enterprise requirements. Treat the entire input as ONE Business Requirement (BR-001) and break it into multiple Functional Requirements (FR-001, FR-002, …).
+
+Rules:
+- Identify EVERY independent capability, validation, calculation, integration, approval, notification, report, security or audit action implied by the text. Each becomes ONE Functional Requirement.
+- For a typical multi-step enterprise paragraph you should produce 5–15 FRs (use fewer only when the input is genuinely trivial).
+- Each FR must be ATOMIC — one verifiable business capability.
+- Classify each FR with a category from this controlled vocabulary: Functional, Business Rule, Validation, Calculation, Integration, Security, Audit, Notification, Reporting, Compliance, Workflow, Approval, Data Requirement, Document Requirement, Performance, Availability, Usability, Accessibility, Error Handling, Logging, API Requirement, Configuration.
+- Return decomposition.businessRequirement = { id: "BR-001", name, description } and decomposition.functionalRequirements = [{ id: "FR-001", name, description, category, priority, businessValue, complexity, businessOwner?, primaryStakeholder?, dependencies[], assumptions[], constraints[], sourceParagraph, status }].
+
+=== USER STORY GROUPING ===
+Generate user stories PER Functional Requirement (typically 1–3 stories per FR; complex FRs may have more). Every story MUST carry functionalRequirementId equal to its parent FR id (e.g. "FR-003"). Use storyId values US-001, US-002, … sequential across the whole backlog. Do NOT generate one flat list disconnected from FRs.
+
 === REQUIREMENT QUALITY SCORING (out of 100) ===
-Score these 10 dimensions, each 0-10:
-businessObjective, actorsStakeholders, functionalRequirements, businessRules, validations,
-workflowCoverage, exceptionHandling, integrations, nonFunctionalRequirements, testability.
+Score 10 dimensions, each 0-10: businessObjective, actorsStakeholders, functionalRequirements, businessRules, validations, workflowCoverage, exceptionHandling, integrations, nonFunctionalRequirements, testability.
+A well-written enterprise requirement that covers objective, actors, workflow, validations, integrations and basic NFRs SHOULD score 85-95. Only deduct for genuine omissions. Record each deduction in scoreRationale.deductions explaining WHY points were deducted. qualityScore = SUM of the 10 dimensions.
 
-CRITICAL: This is BUSINESS REQUIREMENT stage, not a technical spec. A well-written enterprise requirement that contains a clear objective, actors, workflow steps, key validations, integrations and basic NFRs SHOULD score 85-95. Only deduct for information genuinely missing given typical BR maturity. Record each deduction in scoreRationale.deductions.
-qualityScore = SUM of the 10 dimensions.
+=== USER STORY DETAIL ===
+Each story: storyId (US-NNN), functionalRequirementId (FR-NNN), title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA/iWant/soThat, and acceptanceCriteria with three Gherkin scenarios (happyPath, validation, exception) — each a single string with Given/When/Then on newlines.
 
-=== USER STORY DECOMPOSITION ===
-Generate 8-20 backlog-ready user stories (only fewer for trivial single-capability requirements). Decompose every capability/step/validation/integration/notification/admin action.
-Each story: storyId (US-001…), title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA/iWant/soThat, and acceptanceCriteria with three Gherkin scenarios (happyPath, validation, exception) — each a single string with Given/When/Then on newlines.
+=== CLARIFICATION QUESTIONS — GROUPED ===
+Provide clarificationQuestions as a flat list (4-10 items) AND clarificationGroups as an array of { functionalRequirementId, functionalRequirementName, questions[] } so questions can be displayed beneath their parent FR.
 
-=== BRD (BUSINESS REQUIREMENTS DOCUMENT) ===
-Produce a complete brd object suitable for stakeholder review:
-- executiveSummary (3-5 sentence paragraph, references this requirement)
-- businessObjective (one paragraph)
-- problemStatement (what business problem THIS requirement solves)
-- currentState (today's pain points / manual processes implied)
-- futureState (target state after implementation)
-- inScope (5-10 bullet items)
-- outOfScope (3-7 bullet items, explicit exclusions)
-- constraints (3-7 bullets: regulatory, technical, time, budget)
-- businessRules (5-10 explicit rules derived from the text — well-formed: "The system shall…")
-- dependencies (3-7 bullets — systems, teams, data sources)
-- successMetrics (3-7 measurable KPIs, e.g. "Reduce claim processing time from 5 days to 2 days")
+=== STAKEHOLDERS ===
+Each stakeholder: name, role, interest, influence, plus optional power, communicationFrequency, communicationMethod, raci (R/A/C/I), owner.
+
+=== RISKS ===
+Each risk: description, impact, likelihood, mitigation, optional category, optional functionalRequirementId (FR-NNN it relates to), optional userStoryId, optional owner, optional status.
+
+=== BRD ===
+Produce a complete brd object: executiveSummary, businessObjective, problemStatement, currentState, futureState, inScope[5-10], outOfScope[3-7], constraints[3-7], businessRules[5-10], dependencies[3-7], successMetrics[3-7].
 
 === PROCESS FLOW + UML ACTIVITY DIAGRAM ===
-Produce a processFlow object with TWO complementary views of the end-to-end business process implied by this requirement:
-
-1) BUSINESS PROCESS FLOW (high-level, swimlane-style narrative):
-- actors: array of actor names (e.g. "Customer", "Underwriter", "Core Banking System")
-- activities: ordered array of activity step labels (verb phrases, e.g. "Create Claim", "Upload Documents")
-- decisionPoints: array of { question, yesPath, noPath } objects for branches in the flow
-- systemActions: array of automated system actions (e.g. "Generate Reference Number")
-- integrations: array of external systems touched
-- endStates: array of terminal outcomes (e.g. "Settlement Completed", "Claim Rejected")
-- textFlow: ordered array of step strings forming a readable narrative (arrows implied)
-- mermaid: a complete valid Mermaid \`flowchart TD\` diagram of the business process. Use () for start, [] for actions, {} for decisions, (()) for end states. Use -->|Yes|/|No| labels on decisions. Node IDs must be short alphanumeric. NO code fences.
-
-2) activityDiagram — a proper UML Activity Diagram derived from the SAME requirement. The NARRATIVE is the primary deliverable; the visual diagram is secondary. Both must reflect the same flow.
-   - startNode: label for the initial node (typically "Start")
-   - endNodes: array of final/terminal node labels (success AND failure outcomes)
-   - activities: ordered list of activity labels (verb-object), including BOTH actor actions and system actions
-   - decisions: array of { question, yesPath, noPath } — every validation branch, approval/rejection branch, and conditional path
-   - alternatePaths: array of alternate-flow descriptions (e.g. "User chooses social login instead of email")
-   - exceptionPaths: array of exception/error scenario descriptions (e.g. "Payment gateway timeout → retry then refund")
-   - actorActions: array of { actor, action } pairs assigning responsibility
-   - systemActions: array of automated/system-performed actions
-   - integrationPoints: array of integration touchpoints (e.g. "CIBIL — fetch credit score")
-   - narrative: REQUIRED. An ordered array of short strings representing the full activity flow in this EXACT format (one element per line). Use these line types verbatim:
-       * "Start" — first element
-       * "→ <verb phrase>" — an activity step (prefix is the arrow character → followed by a space)
-       * "Decision:" — opens a decision block (next element MUST be the question text without any prefix)
-       * "<Question text ending with ?>" — immediately follows "Decision:"
-       * "No" or "Yes" — branch label on its own line, followed by the "→ <step>" elements for that branch
-       * "End" — terminal node (may appear multiple times for different end states)
-     Example (loan application):
-       ["Start",
-        "→ Customer enters application details",
-        "→ Customer uploads documents",
-        "→ System validates information",
-        "Decision:", "Are mandatory fields complete?",
-        "No", "→ Display validation errors", "→ Return to application entry",
-        "Yes", "→ Continue processing",
-        "Decision:", "Eligible for loan?",
-        "No", "→ Reject application", "→ Notify customer", "End",
-        "Yes", "→ Generate offer", "→ Loan officer review",
-        "Decision:", "Approved?",
-        "No", "→ Reject application", "→ Notify customer", "End",
-        "Yes", "→ Disburse loan", "→ Notify customer", "End"]
-     Use the same shape for the user's actual requirement — DO NOT copy the loan example. Every line must trace to the requirement text.
-   - textActivityFlow: a secondary, tagged version of the same flow using prefixes "[Start]", "[Activity]", "[Decision]", "[Validation]", "[Exception]", "[Integration]", "[Actor: X]", "[System]", "[End: <outcome>]". One step per array entry.
-   - mermaid: a syntactically VALID Mermaid \`flowchart TD\` diagram of the activity diagram. Keep it simple and safe:
-       * Start: \`Start((Start))\`
-       * Activities: \`A1[Submit Application]\`
-       * Decisions: \`D1{Is application valid?}\` with branches \`-->|Yes| ...\` / \`-->|No| ...\`
-       * End nodes: \`E1((Approved))\`, \`E2((Rejected))\`
-       * Node IDs must be short alphanumeric. NO markdown code fences. NO parentheses or quotes inside node labels — use plain words only. Every referenced node must be defined.
-     If you are not confident the mermaid is valid, output the minimal diagram \`flowchart TD\\n  Start((Start)) --> End((End))\` — the narrative is what matters.
-
-
+Produce processFlow with both a business process flow view and an activityDiagram view. Each activity step should, where possible, trace to an FR. Use the narrative format: ["Start", "→ <step>", "Decision:", "<question?>", "Yes", "→ ...", "No", "→ ...", "End"]. Provide a syntactically simple mermaid flowchart TD as a fallback.
 
 === OTHER OUTPUTS ===
 - confidence (0-100)
-- ambiguities: exact substrings + why ambiguous
-- missingActors / missingBusinessRules / missingValidations / missingWorkflows / missingExceptionScenarios / missingNonFunctionalRequirements — phrased specifically against THIS requirement
-- 4-8 clarification questions
+- ambiguities: exact substrings + why
+- missingActors / missingBusinessRules / missingValidations / missingWorkflows / missingExceptionScenarios / missingNonFunctionalRequirements — specific to THIS requirement
 - 4-8 improvement suggestions
-- 3-7 risks (description, impact, likelihood, mitigation)
 - 3-7 assumptions
 - 3-7 stakeholders
 - highlights: exact substrings + category (ambiguous|missing|risk) + note
 
-Stay grounded in the user's exact wording. Output enterprise-grade artifacts.`;
+Stay grounded in the user's exact wording. Output enterprise-grade artifacts with strict traceability BR → FR → US → AC → Risk.`;
 
 const analysisTool = {
   type: "function",
@@ -173,7 +124,63 @@ const analysisTool = {
         missingExceptionScenarios: { type: "array", items: { type: "string" } },
         missingNonFunctionalRequirements: { type: "array", items: { type: "string" } },
         clarificationQuestions: { type: "array", items: { type: "string" } },
+        clarificationGroups: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              functionalRequirementId: { type: "string" },
+              functionalRequirementName: { type: "string" },
+              questions: { type: "array", items: { type: "string" } },
+            },
+            required: ["functionalRequirementId", "functionalRequirementName", "questions"],
+          },
+        },
         improvementSuggestions: { type: "array", items: { type: "string" } },
+        decomposition: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            businessRequirement: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                id: { type: "string" },
+                name: { type: "string" },
+                description: { type: "string" },
+              },
+              required: ["id", "name", "description"],
+            },
+            functionalRequirements: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  description: { type: "string" },
+                  category: { type: "string" },
+                  type: { type: "string" },
+                  priority: { type: "string", enum: ["High", "Medium", "Low"] },
+                  businessValue: { type: "string" },
+                  complexity: { type: "string", enum: ["High", "Medium", "Low"] },
+                  businessOwner: { type: "string" },
+                  primaryStakeholder: { type: "string" },
+                  dependencies: { type: "array", items: { type: "string" } },
+                  assumptions: { type: "array", items: { type: "string" } },
+                  constraints: { type: "array", items: { type: "string" } },
+                  sourceParagraph: { type: "string" },
+                  status: { type: "string" },
+                },
+                required: ["id", "name", "description", "category", "priority", "businessValue", "complexity"],
+              },
+            },
+          },
+          required: ["businessRequirement", "functionalRequirements"],
+        },
         userStories: {
           type: "array",
           minItems: 1,
@@ -182,6 +189,7 @@ const analysisTool = {
             additionalProperties: false,
             properties: {
               storyId: { type: "string" },
+              functionalRequirementId: { type: "string" },
               title: { type: "string" },
               priority: { type: "string", enum: ["High", "Medium", "Low"] },
               businessValue: { type: "string" },
@@ -200,7 +208,7 @@ const analysisTool = {
                 required: ["happyPath", "validation", "exception"],
               },
             },
-            required: ["storyId","title","priority","businessValue","complexityPoints","asA","iWant","soThat","acceptanceCriteria"],
+            required: ["storyId","functionalRequirementId","title","priority","businessValue","complexityPoints","asA","iWant","soThat","acceptanceCriteria"],
           },
         },
         stakeholders: {
@@ -213,6 +221,11 @@ const analysisTool = {
               role: { type: "string" },
               interest: { type: "string", enum: ["High", "Medium", "Low"] },
               influence: { type: "string", enum: ["High", "Medium", "Low"] },
+              power: { type: "string", enum: ["High", "Medium", "Low"] },
+              communicationFrequency: { type: "string" },
+              communicationMethod: { type: "string" },
+              raci: { type: "string" },
+              owner: { type: "string" },
             },
             required: ["name", "role", "interest", "influence"],
           },
@@ -227,6 +240,11 @@ const analysisTool = {
               impact: { type: "string", enum: ["High", "Medium", "Low"] },
               likelihood: { type: "string", enum: ["High", "Medium", "Low"] },
               mitigation: { type: "string" },
+              category: { type: "string" },
+              functionalRequirementId: { type: "string" },
+              userStoryId: { type: "string" },
+              owner: { type: "string" },
+              status: { type: "string" },
             },
             required: ["description", "impact", "likelihood", "mitigation"],
           },
@@ -337,7 +355,7 @@ const analysisTool = {
         "suggestedTitle","qualityScore","confidence","scoreBreakdown","scoreRationale",
         "ambiguities","missingActors","missingBusinessRules","missingValidations",
         "missingWorkflows","missingExceptionScenarios","missingNonFunctionalRequirements",
-        "clarificationQuestions","improvementSuggestions","userStories",
+        "clarificationQuestions","improvementSuggestions","decomposition","userStories",
         "stakeholders","risks","assumptions","highlights","brd","processFlow",
       ],
     },

@@ -17,7 +17,7 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("userStoryId");
+  const [sortKey, setSortKey] = useState<SortKey>("frId");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const filtered = useMemo(() => {
@@ -42,13 +42,17 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
   }
 
   const COLS: { key: SortKey; label: string }[] = [
-    { key: "requirementId", label: "Req ID" },
-    { key: "requirementDescription", label: "Requirement" },
-    { key: "userStoryId", label: "Story ID" },
-    { key: "acceptanceCriteriaId", label: "AC ID" },
-    { key: "riskId", label: "Risk ID" },
-    { key: "stakeholder", label: "Stakeholder" },
+    { key: "brId", label: "BR ID" },
+    { key: "frId", label: "FR ID" },
+    { key: "frName", label: "Functional Requirement" },
+    { key: "frCategory", label: "Category" },
+    { key: "userStoryId", label: "Story" },
+    { key: "acceptanceCriteriaId", label: "AC" },
+    { key: "riskId", label: "Risk" },
+    { key: "stakeholder", label: "Owner" },
     { key: "priority", label: "Priority" },
+    { key: "sprint", label: "Sprint" },
+    { key: "verificationStatus", label: "Verification" },
     { key: "status", label: "Status" },
   ];
 
@@ -68,7 +72,7 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Mappings</p>
             <p className="text-3xl font-bold mt-1 text-foreground">{report.rows.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">across {req.analysis.userStories.length} stories</p>
+            <p className="text-xs text-muted-foreground mt-1">BR → FR → US → AC</p>
           </CardContent>
         </Card>
         <Card className="shadow-soft border-border/60">
@@ -83,10 +87,10 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
         <Card className="shadow-soft border-border/60">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" /> Orphan Requirements
+              <AlertTriangle className="h-3 w-3" /> Orphan FRs
             </p>
-            <p className="text-3xl font-bold mt-1 text-destructive">{report.orphanRequirements.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">{report.orphanRequirements.join(", ") || "None"}</p>
+            <p className="text-3xl font-bold mt-1 text-destructive">{report.orphanFrs.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">{report.orphanFrs.join(", ") || "None"}</p>
           </CardContent>
         </Card>
       </div>
@@ -94,7 +98,7 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
       <Card className="shadow-soft border-border/60">
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between">
-            <CardTitle className="text-sm">Requirement Traceability Matrix</CardTitle>
+            <CardTitle className="text-sm">Requirement Traceability Matrix · BR → FR → US → AC → Risk</CardTitle>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => { exportRtmExcel(req, report); toast.success("Excel downloaded"); }}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
@@ -124,7 +128,7 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Traced">Traced</SelectItem>
                 <SelectItem value="Orphan Story">Orphan Story</SelectItem>
-                <SelectItem value="Orphan Requirement">Orphan Requirement</SelectItem>
+                <SelectItem value="Orphan FR">Orphan FR</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -146,8 +150,10 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
               <TableBody>
                 {filtered.map((r, i) => (
                   <TableRow key={i} className={r.status !== "Traced" ? "bg-warning/5" : ""}>
-                    <TableCell className="font-mono text-xs">{r.requirementId}</TableCell>
-                    <TableCell className="text-sm max-w-[260px] truncate" title={r.requirementDescription}>{r.requirementDescription}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.brId}</TableCell>
+                    <TableCell className="font-mono text-xs">{r.frId}</TableCell>
+                    <TableCell className="text-sm max-w-[240px] truncate" title={r.frName}>{r.frName}</TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[10px]">{r.frCategory}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{r.userStoryId}</TableCell>
                     <TableCell className="font-mono text-xs">{r.acceptanceCriteriaId}</TableCell>
                     <TableCell className="font-mono text-xs">{r.riskId}</TableCell>
@@ -159,6 +165,8 @@ export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requir
                         "bg-muted text-muted-foreground"
                       }>{r.priority}</Badge>
                     </TableCell>
+                    <TableCell className="text-xs">{r.sprint ?? "—"}</TableCell>
+                    <TableCell className="text-xs">{r.verificationStatus ?? "—"}</TableCell>
                     <TableCell>
                       {r.status === "Traced" ? (
                         <Badge variant="outline" className="bg-success/10 text-success border-success/30">

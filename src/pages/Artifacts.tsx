@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { exportCSV, exportDOCX, exportPDF } from "@/lib/exporters";
 import { toast } from "sonner";
-import { SCORE_DIMENSIONS, type Highlight, type Requirement } from "@/lib/analyzer";
+import { SCORE_DIMENSIONS, ensureDecomposition, type Highlight, type Requirement } from "@/lib/analyzer";
 import { RtmTab } from "@/components/artifacts/RtmTab";
 import { BrdTab } from "@/components/artifacts/BrdTab";
 import { ProcessFlowTab } from "@/components/artifacts/ProcessFlowTab";
@@ -153,6 +153,20 @@ export default function Artifacts() {
   }
 
   const a = req.analysis;
+  const decomp = ensureDecomposition(a);
+  const frById = new Map(decomp.functionalRequirements.map((fr) => [fr.id, fr]));
+  const storiesByFr = new Map<string, typeof a.userStories>();
+  decomp.functionalRequirements.forEach((fr) =>
+    storiesByFr.set(fr.id, a.userStories.filter((s) => s.functionalRequirementId === fr.id))
+  );
+  const unassignedStories = a.userStories.filter(
+    (s) => !s.functionalRequirementId || !frById.has(s.functionalRequirementId)
+  );
+
+  // Category counts for breakdown stats
+  const catCount = (cat: string) =>
+    decomp.functionalRequirements.filter((fr) => String(fr.category).toLowerCase() === cat.toLowerCase()).length;
+
   const scoreTone =
     a.qualityScore >= 80 ? "text-success" : a.qualityScore >= 60 ? "text-warning" : "text-destructive";
   const scoreLabel =
@@ -368,6 +382,7 @@ export default function Artifacts() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="flex flex-wrap h-auto w-full justify-start gap-1">
             <TabsTrigger value="analysis">Analysis</TabsTrigger>
+            <TabsTrigger value="breakdown">Breakdown</TabsTrigger>
             <TabsTrigger value="stories">User Stories</TabsTrigger>
             <TabsTrigger value="people">Stakeholders</TabsTrigger>
             <TabsTrigger value="risks">Risks</TabsTrigger>
@@ -434,14 +449,28 @@ export default function Artifacts() {
                     <HelpCircle className="h-4 w-4 text-accent-foreground" /> Clarification Questions
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <ol className="space-y-2 list-decimal list-inside">
-                    {a.clarificationQuestions.map((x, i) => (
-                      <li key={i} className="text-sm text-foreground">
-                        {x}
-                      </li>
-                    ))}
-                  </ol>
+                <CardContent className="space-y-4">
+                  {a.clarificationGroups?.length ? (
+                    a.clarificationGroups.map((g, gi) => (
+                      <div key={gi}>
+                        <p className="text-[11px] font-semibold text-primary uppercase tracking-wider mb-1.5">
+                          {g.functionalRequirementId ? `${g.functionalRequirementId} · ` : ""}
+                          {g.functionalRequirementName ?? "General"}
+                        </p>
+                        <ol className="space-y-1.5 list-decimal list-inside">
+                          {g.questions.map((q, qi) => (
+                            <li key={qi} className="text-sm text-foreground">{q}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    ))
+                  ) : (
+                    <ol className="space-y-2 list-decimal list-inside">
+                      {a.clarificationQuestions.map((x, i) => (
+                        <li key={i} className="text-sm text-foreground">{x}</li>
+                      ))}
+                    </ol>
+                  )}
                 </CardContent>
               </Card>
 
@@ -480,66 +509,199 @@ export default function Artifacts() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="stories" className="space-y-4 mt-4">
+          <TabsContent value="breakdown" className="space-y-4 mt-4">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { label: "Total FRs", value: decomp.functionalRequirements.length, tone: "text-primary" },
+                { label: "Functional", value: catCount("Functional"), tone: "text-foreground" },
+                { label: "Business Rules", value: catCount("Business Rule"), tone: "text-foreground" },
+                { label: "Validations", value: catCount("Validation"), tone: "text-foreground" },
+                { label: "Integrations", value: catCount("Integration"), tone: "text-foreground" },
+                { label: "Notifications", value: catCount("Notification"), tone: "text-foreground" },
+                { label: "Reports", value: catCount("Reporting"), tone: "text-foreground" },
+                { label: "Security", value: catCount("Security"), tone: "text-foreground" },
+                { label: "Compliance", value: catCount("Compliance"), tone: "text-foreground" },
+                { label: "Approvals", value: catCount("Approval"), tone: "text-foreground" },
+              ].map((s) => (
+                <Card key={s.label} className="shadow-soft border-border/60">
+                  <CardContent className="p-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${s.tone}`}>{s.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* BR card */}
+            <Card className="shadow-soft border-border/60">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground">
+                    {decomp.businessRequirement.id}
+                  </span>
+                  {decomp.businessRequirement.name}
+                </CardTitle>
+              </CardHeader>
+              {decomp.businessRequirement.description && (
+                <CardContent className="pt-0">
+                  <p className="text-sm text-muted-foreground">{decomp.businessRequirement.description}</p>
+                </CardContent>
+              )}
+            </Card>
+
+            {/* FRs */}
+            <div className="space-y-3">
+              {decomp.functionalRequirements.map((fr) => {
+                const linkedStories = storiesByFr.get(fr.id) ?? [];
+                return (
+                  <Card key={fr.id} className="shadow-soft border-border/60">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="min-w-0">
+                          <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{fr.id}</span>
+                            <span>{fr.name}</span>
+                            <Badge variant="secondary" className="text-[10px]">{String(fr.category)}</Badge>
+                          </CardTitle>
+                          {fr.description && (
+                            <p className="text-xs text-muted-foreground mt-1.5">{fr.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className={priorityColor[fr.priority]}>{fr.priority}</Badge>
+                          <Badge variant="outline" className="text-[10px]">Complexity: {fr.complexity}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{fr.status}</Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-2">
+                      {fr.businessValue && (
+                        <p className="text-xs"><span className="font-semibold text-muted-foreground">Business Value:</span> {fr.businessValue}</p>
+                      )}
+                      {(fr.businessOwner || fr.primaryStakeholder) && (
+                        <p className="text-xs">
+                          {fr.businessOwner && <><span className="font-semibold text-muted-foreground">Owner:</span> {fr.businessOwner}  </>}
+                          {fr.primaryStakeholder && <><span className="font-semibold text-muted-foreground">Stakeholder:</span> {fr.primaryStakeholder}</>}
+                        </p>
+                      )}
+                      {!!fr.dependencies?.length && (
+                        <p className="text-xs"><span className="font-semibold text-muted-foreground">Dependencies:</span> {fr.dependencies.join(", ")}</p>
+                      )}
+                      {!!fr.assumptions?.length && (
+                        <p className="text-xs"><span className="font-semibold text-muted-foreground">Assumptions:</span> {fr.assumptions.join(", ")}</p>
+                      )}
+                      {!!fr.constraints?.length && (
+                        <p className="text-xs"><span className="font-semibold text-muted-foreground">Constraints:</span> {fr.constraints.join(", ")}</p>
+                      )}
+                      {!!linkedStories.length && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Stories:</span>
+                          {linkedStories.map((s) => (
+                            <Badge key={s.storyId} variant="secondary" className="font-mono text-[10px]">{s.storyId}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="stories" className="space-y-6 mt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {a.userStories.length} backlog-ready stories ·{" "}
+                {a.userStories.length} stories across {decomp.functionalRequirements.length} functional requirements ·{" "}
                 {a.userStories.reduce((sum, s) => sum + (s.complexityPoints ?? 0), 0)} total story points
               </p>
             </div>
-            {a.userStories.map((s) => {
-              const acRows: { label: string; gherkin: string }[] = [
-                { label: "Happy Path", gherkin: s.acceptanceCriteria?.happyPath ?? "" },
-                { label: "Validation Scenario", gherkin: s.acceptanceCriteria?.validation ?? "" },
-                { label: "Exception Scenario", gherkin: s.acceptanceCriteria?.exception ?? "" },
-              ];
+            {decomp.functionalRequirements.map((fr) => {
+              const linkedStories = storiesByFr.get(fr.id) ?? [];
+              if (!linkedStories.length) return null;
               return (
-                <Card key={s.id} className="shadow-soft border-border/60">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                      <div className="min-w-0">
-                        <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{s.storyId}</span>
-                          <span>{s.title}</span>
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1.5">{s.businessValue}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
-                        <Badge variant="secondary" className="font-mono">{s.complexityPoints} pts</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
-                      <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
-                      <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
-                      <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                        Acceptance Criteria (Gherkin)
-                      </p>
-                      <div className="space-y-3">
-                        {acRows.map((r) => (
-                          <div key={r.label}>
-                            <p className="text-[11px] font-semibold text-primary mb-1">{r.label}</p>
-                            <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
-{r.gherkin}
-                            </pre>
+                <div key={fr.id} className="space-y-3">
+                  <div className="flex items-center gap-2 flex-wrap border-l-4 border-primary pl-3 py-1 bg-accent/30 rounded-r">
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground">{fr.id}</span>
+                    <span className="text-sm font-semibold">{fr.name}</span>
+                    <Badge variant="secondary" className="text-[10px]">{String(fr.category)}</Badge>
+                    <span className="text-xs text-muted-foreground ml-auto">{linkedStories.length} {linkedStories.length === 1 ? "story" : "stories"}</span>
+                  </div>
+                  {linkedStories.map((s) => {
+                    const acRows: { label: string; id: string; gherkin: string }[] = [
+                      { label: "Happy Path", id: `AC-${s.storyId}-01`, gherkin: s.acceptanceCriteria?.happyPath ?? "" },
+                      { label: "Validation Scenario", id: `AC-${s.storyId}-02`, gherkin: s.acceptanceCriteria?.validation ?? "" },
+                      { label: "Exception Scenario", id: `AC-${s.storyId}-03`, gherkin: s.acceptanceCriteria?.exception ?? "" },
+                    ];
+                    return (
+                      <Card key={s.id} className="shadow-soft border-border/60 ml-2">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div className="min-w-0">
+                              <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{s.storyId}</span>
+                                <span>{s.title}</span>
+                                <span className="font-mono text-[10px] text-muted-foreground">↳ {fr.id}</span>
+                              </CardTitle>
+                              <p className="text-xs text-muted-foreground mt-1.5">{s.businessValue}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
+                              <Badge variant="secondary" className="font-mono">{s.complexityPoints} pts</Badge>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
+                            <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
+                            <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
+                            <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                              Acceptance Criteria (Gherkin)
+                            </p>
+                            <div className="space-y-3">
+                              {acRows.map((r) => (
+                                <div key={r.label}>
+                                  <p className="text-[11px] font-semibold text-primary mb-1 flex items-center gap-2">
+                                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10">{r.id}</span>
+                                    {r.label}
+                                  </p>
+                                  <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
+{r.gherkin}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
               );
             })}
+            {!!unassignedStories.length && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-warning uppercase tracking-wider">Unassigned</p>
+                {unassignedStories.map((s) => (
+                  <Card key={s.id} className="shadow-soft border-border/60">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-warning/15 text-warning">{s.storyId}</span>
+                        {s.title}
+                      </CardTitle>
+                    </CardHeader>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="people" className="mt-4">
             <Card className="shadow-soft border-border/60">
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -547,6 +709,10 @@ export default function Artifacts() {
                       <TableHead>Role</TableHead>
                       <TableHead>Interest</TableHead>
                       <TableHead>Influence</TableHead>
+                      <TableHead>Power</TableHead>
+                      <TableHead>RACI</TableHead>
+                      <TableHead>Comm. Freq.</TableHead>
+                      <TableHead>Method</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -554,12 +720,12 @@ export default function Artifacts() {
                       <TableRow key={i}>
                         <TableCell className="font-medium">{s.name}</TableCell>
                         <TableCell className="text-muted-foreground">{s.role}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{s.interest}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{s.influence}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant="outline">{s.interest}</Badge></TableCell>
+                        <TableCell><Badge variant="outline">{s.influence}</Badge></TableCell>
+                        <TableCell>{s.power ? <Badge variant="outline">{s.power}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        <TableCell>{s.raci ? <Badge variant="secondary" className="font-mono text-[10px]">{s.raci}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{s.communicationFrequency ?? "—"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{s.communicationMethod ?? "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -570,38 +736,38 @@ export default function Artifacts() {
 
           <TabsContent value="risks" className="mt-4">
             <Card className="shadow-soft border-border/60">
-              <CardContent className="p-0">
+              <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-20">ID</TableHead>
                       <TableHead>Risk</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Linked FR</TableHead>
                       <TableHead className="w-24">Impact</TableHead>
                       <TableHead className="w-28">Likelihood</TableHead>
                       <TableHead>Mitigation</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {a.risks.map((r) => (
                       <TableRow key={r.id}>
+                        <TableCell className="font-mono text-xs">{r.riskId ?? "—"}</TableCell>
                         <TableCell className="font-medium">{r.description}</TableCell>
+                        <TableCell>{r.category ? <Badge variant="secondary" className="text-[10px]">{r.category}</Badge> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="font-mono text-xs">{r.functionalRequirementId ?? "—"}</TableCell>
                         <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              r.impact === "High"
-                                ? "bg-destructive/10 text-destructive border-destructive/30"
-                                : r.impact === "Medium"
-                                ? "bg-warning/10 text-warning border-warning/30"
-                                : "bg-muted"
-                            }
-                          >
-                            {r.impact}
-                          </Badge>
+                          <Badge variant="outline" className={
+                            r.impact === "High" ? "bg-destructive/10 text-destructive border-destructive/30" :
+                            r.impact === "Medium" ? "bg-warning/10 text-warning border-warning/30" : "bg-muted"
+                          }>{r.impact}</Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{r.likelihood}</Badge>
-                        </TableCell>
+                        <TableCell><Badge variant="outline">{r.likelihood}</Badge></TableCell>
                         <TableCell className="text-muted-foreground text-sm">{r.mitigation}</TableCell>
+                        <TableCell className="text-xs">{r.owner ?? "—"}</TableCell>
+                        <TableCell className="text-xs">{r.status ?? "Open"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

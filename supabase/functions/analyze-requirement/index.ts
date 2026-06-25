@@ -419,10 +419,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "AI request failed.", detail: body }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const data = await aiRes.json();
+    const aiRaw = await aiRes.text();
+    if (!aiRaw) {
+      return new Response(JSON.stringify({ error: "AI gateway returned an empty response. The model output may have been truncated — please retry." }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    let data: any;
+    try { data = JSON.parse(aiRaw); }
+    catch {
+      console.error("AI gateway non-JSON response", aiRaw.slice(0, 500));
+      return new Response(JSON.stringify({ error: "AI gateway returned a non-JSON response." }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const call = data?.choices?.[0]?.message?.tool_calls?.[0];
+    const finishReason = data?.choices?.[0]?.finish_reason;
     if (!call?.function?.arguments) {
-      return new Response(JSON.stringify({ error: "AI returned no structured analysis." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: `AI returned no structured analysis (finish_reason: ${finishReason ?? "unknown"}). Try shortening the requirement and retry.` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     let parsed: Record<string, unknown>;

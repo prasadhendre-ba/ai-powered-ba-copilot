@@ -42,15 +42,25 @@ export default function Analyzer() {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stageIdx, setStageIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const addRequirementFromAi = useStore((s) => s.addRequirementFromAi);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading) return;
+    setStageIdx(0);
+    const id = setInterval(() => {
+      setStageIdx((i) => Math.min(i + 1, LOADING_STAGES.length - 1));
+    }, 2200);
+    return () => clearInterval(id);
+  }, [loading]);
 
   const handleAnalyze = async () => {
     setError(null);
     const trimmed = text.trim();
     if (trimmed.length < 20) {
-      toast.error("Please enter at least 20 characters of requirement text");
+      toast.error("Please enter at least 20 characters of requirement text.");
       return;
     }
     setLoading(true);
@@ -64,14 +74,14 @@ export default function Analyzer() {
       }
       const raw = (data as { analysis: RawAiAnalysis }).analysis;
       const req = addRequirementFromAi(title.trim(), trimmed, raw);
-      toast.success("AI analysis complete", {
+      toast.success("Analysis complete", {
         description: `Quality ${req.analysis.qualityScore}/100 · Confidence ${req.analysis.confidence}%`,
       });
       navigate(`/artifacts?id=${req.id}`);
     } catch (e) {
-      const msg = (e as Error).message || "Unexpected error";
-      setError(msg);
-      toast.error("Analysis failed", { description: msg });
+      const friendly = friendlyError((e as Error).message);
+      setError(friendly);
+      toast.error("Analysis could not be completed", { description: friendly });
     } finally {
       setLoading(false);
     }

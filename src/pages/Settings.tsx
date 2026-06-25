@@ -202,11 +202,19 @@ export default function SettingsPage() {
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wider text-muted-foreground">Version</dt>
-              <dd className="font-medium text-foreground">1.0</dd>
+              <dd className="font-medium text-foreground">1.0.0</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Release Date</dt>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Status</dt>
+              <dd className="font-medium text-success">Production Ready</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Release</dt>
               <dd className="font-medium text-foreground">June 2026</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Built By</dt>
+              <dd className="font-medium text-foreground">Prasad Hendre</dd>
             </div>
           </dl>
         </CardContent>

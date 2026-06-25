@@ -1,15 +1,18 @@
 // Edge function: analyze-requirement
-// Senior Business Analyst pipeline. Splits the work into multiple smaller AI calls
-// so each request stays well under the gateway timeout, while the AGGREGATED
-// deliverable remains comprehensive (no artificial caps on BRs/FRs/Stories/Risks/ACs).
+// Senior Business Analyst pipeline. Orchestrates MANY small AI calls in parallel so
+// each individual gateway request stays well under the timeout, while the merged
+// deliverable remains comprehensive. NO artificial caps on BRs / FRs / Stories /
+// ACs / Risks / Stakeholders / BRD sections / RTM rows / Activity Diagram nodes.
 //
-// Pipeline:
-//   Stage 1 (parallel):
-//     A. Decomposition + BRD + Process Flow (+ Activity Diagram)
-//     B. Quality scoring + ambiguities + missing items + clarifications + improvements
-//        + stakeholders + risks + assumptions + highlights
-//   Stage 2 (sequential, fan-out per FR chunk):
-//     C. User stories with Gherkin AC — chunked across FR groups so each call is small.
+// Pipeline (all of Stage 1 runs in parallel):
+//   Stage 1:
+//     A1  Decomposition  (BR + as many FRs as the text warrants)
+//     A2  BRD            (15-section enterprise BRD)
+//     A3  Process Flow + UML Activity Diagram
+//     B1  Quality scoring + gap analysis + clarifications + improvements + highlights + assumptions
+//     B2  Stakeholders + Risks
+//   Stage 2 (after A1):
+//     C   User Stories with full Gherkin AC, chunked across FR groups in parallel.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,53 +21,77 @@ const corsHeaders = {
 
 const MODEL = "google/gemini-3-flash-preview";
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const CALL_TIMEOUT_MS = 70_000;
+const CALL_TIMEOUT_MS = 75_000;
+const STORY_CHUNK_SIZE = 4; // small chunks → fast + richer per-FR stories
 
-const BASE_PERSONA = `You are a Senior Business Analyst with 15+ years of enterprise experience producing BRD, FRD, RTM, Process Flow and Agile backlog artifacts. Analyze the requirement EXACTLY as written. Reference specific words, phrases, actors, processes, workflows, business rules, validations, integrations and edge cases present in the text. Every output item MUST be traceable to the requirement text. Return ONLY valid minified JSON. No markdown. No code fences.`;
+const BASE_PERSONA = `You are a Senior Business Analyst with 15+ years of enterprise experience producing BRD, FRD, RTM, Process Flow and Agile backlog artifacts. Analyze the requirement EXACTLY as written. Reference specific words, phrases, actors, processes, workflows, business rules, validations, integrations and edge cases present in the text. Every output item MUST be traceable to the requirement text. Generate AS MANY items as the requirement genuinely warrants — never truncate, never cap, never summarize away detail. Return ONLY valid minified JSON. No markdown. No code fences.`;
 
-// ---------- Prompts ----------
+// ---------- Prompts (each focused → faster + richer) ----------
 
-const PROMPT_A = `${BASE_PERSONA}
+const PROMPT_A1 = `${BASE_PERSONA}
 
-TASK A — REQUIREMENT DECOMPOSITION + BRD + PROCESS FLOW.
+TASK A1 — REQUIREMENT DECOMPOSITION.
 
-Decompose the stakeholder input into ONE Business Requirement (BR-001) and as many atomic Functional Requirements as the text genuinely contains. Do NOT cap the count — generate as many FRs as needed (could be 3, could be 25+). Each FR = one verifiable capability / rule / validation / integration / approval / notification / report / security or audit action.
+Decompose into ONE Business Requirement (BR-001) and a COMPREHENSIVE set of atomic Functional Requirements. Generate every FR the text genuinely supports — for a medium-to-large enterprise input expect 30-60+ FRs; for smaller ones fewer. Never cap. Each FR = ONE verifiable capability / rule / validation / integration / approval / notification / report / security or audit action.
 
-FR category vocabulary: Functional, Business Rule, Validation, Calculation, Integration, Security, Audit, Notification, Reporting, Compliance, Workflow, Approval, Data Requirement, Document Requirement, Performance, Availability, Usability, Accessibility, Error Handling, Logging, API Requirement, Configuration.
+FR categories: Functional, Business Rule, Validation, Calculation, Integration, Security, Audit, Notification, Reporting, Compliance, Workflow, Approval, Data Requirement, Document Requirement, Performance, Availability, Usability, Accessibility, Error Handling, Logging, API Requirement, Configuration.
 
-Also produce:
-- brd: executiveSummary, businessObjective, problemStatement, currentState, futureState, inScope[], outOfScope[], constraints[], businessRules[], dependencies[], successMetrics[] — sized to the requirement (no artificial caps).
-- processFlow with both a business view and a UML activity diagram view. Narrative format: ["Start","→ <step>","Decision:","<question?>","Yes","→ ...","No","→ ...","End"]. Provide a simple mermaid flowchart TD as fallback.
+Return JSON (minified):
+{"suggestedTitle":"string","decomposition":{"businessRequirement":{"id":"BR-001","name":"string","description":"string"},"functionalRequirements":[{"id":"FR-001","name":"string","description":"string","category":"Functional","priority":"High","businessValue":"string","complexity":"Medium","businessOwner":"string","primaryStakeholder":"string","dependencies":["string"],"assumptions":["string"],"constraints":["string"],"sourceParagraph":"string","status":"Draft"}]}}`;
 
-Return JSON exactly in this shape (minified):
-{"suggestedTitle":"string","decomposition":{"businessRequirement":{"id":"BR-001","name":"string","description":"string"},"functionalRequirements":[{"id":"FR-001","name":"string","description":"string","category":"Functional","priority":"High","businessValue":"string","complexity":"Medium","businessOwner":"string","primaryStakeholder":"string","dependencies":["string"],"assumptions":["string"],"constraints":["string"],"sourceParagraph":"string","status":"Draft"}]},"brd":{"executiveSummary":"string","businessObjective":"string","problemStatement":"string","currentState":"string","futureState":"string","inScope":["string"],"outOfScope":["string"],"constraints":["string"],"businessRules":["string"],"dependencies":["string"],"successMetrics":["string"]},"processFlow":{"actors":["string"],"activities":["string"],"decisionPoints":[{"question":"string","yesPath":"string","noPath":"string"}],"systemActions":["string"],"integrations":["string"],"endStates":["string"],"textFlow":["Start","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))","activityDiagram":{"startNode":"Start","endNodes":["End"],"activities":["string"],"decisions":[{"question":"string","yesPath":"string","noPath":"string"}],"alternatePaths":["string"],"exceptionPaths":["string"],"actorActions":[{"actor":"string","action":"string"}],"systemActions":["string"],"integrationPoints":["string"],"textActivityFlow":["Start","→ step","End"],"narrative":["Start","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))"}}}`;
+const PROMPT_A2 = `${BASE_PERSONA}
 
-const PROMPT_B = `${BASE_PERSONA}
+TASK A2 — BUSINESS REQUIREMENTS DOCUMENT (BRD).
 
-TASK B — QUALITY ANALYSIS + GAP ANALYSIS + STAKEHOLDERS + RISKS.
+Produce a full enterprise BRD. Each list section MUST be exhaustive (no caps): include every in-scope / out-of-scope item, every constraint, every business rule, every dependency, every success metric the requirement text supports or reasonably implies. Write executive-grade prose for the narrative fields.
 
-Score 10 dimensions, each 0-10: businessObjective, actorsStakeholders, functionalRequirements, businessRules, validations, workflowCoverage, exceptionHandling, integrations, nonFunctionalRequirements, testability. A well-written enterprise requirement covering objective, actors, workflow, validations, integrations and basic NFRs SHOULD score 85-95. Deduct ONLY for genuine omissions; record each deduction with WHY.
+Return JSON (minified):
+{"brd":{"executiveSummary":"string","businessObjective":"string","problemStatement":"string","currentState":"string","futureState":"string","inScope":["string"],"outOfScope":["string"],"constraints":["string"],"businessRules":["string"],"dependencies":["string"],"successMetrics":["string"]}}`;
 
-Generate as many items as the requirement genuinely warrants — DO NOT cap counts artificially:
+const PROMPT_A3 = `${BASE_PERSONA}
+
+TASK A3 — PROCESS FLOW + UML ACTIVITY DIAGRAM.
+
+Model the end-to-end process. Include EVERY actor, activity, decision, alternate path, exception path, integration point and system action the text implies — never cap.
+
+Narrative format (textFlow / textActivityFlow / narrative): ["Start","→ <step>","Decision:","<question?>","Yes","→ ...","No","→ ...","End"]. Provide a clean mermaid 'flowchart TD' as a secondary visualization.
+
+Return JSON (minified):
+{"processFlow":{"actors":["string"],"activities":["string"],"decisionPoints":[{"question":"string","yesPath":"string","noPath":"string"}],"systemActions":["string"],"integrations":["string"],"endStates":["string"],"textFlow":["Start","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))","activityDiagram":{"startNode":"Start","endNodes":["End"],"activities":["string"],"decisions":[{"question":"string","yesPath":"string","noPath":"string"}],"alternatePaths":["string"],"exceptionPaths":["string"],"actorActions":[{"actor":"string","action":"string"}],"systemActions":["string"],"integrationPoints":["string"],"textActivityFlow":["Start","→ step","End"],"narrative":["Start","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))"}}}`;
+
+const PROMPT_B1 = `${BASE_PERSONA}
+
+TASK B1 — QUALITY SCORING + GAP ANALYSIS.
+
+Score 10 dimensions, each 0-10: businessObjective, actorsStakeholders, functionalRequirements, businessRules, validations, workflowCoverage, exceptionHandling, integrations, nonFunctionalRequirements, testability. Well-written enterprise requirements should score 85-95. Deduct ONLY for genuine omissions; record each deduction with WHY.
+
+Generate every item the requirement genuinely supports — NEVER cap:
 - ambiguities (exact substring + reason)
 - missingActors, missingBusinessRules, missingValidations, missingWorkflows, missingExceptionScenarios, missingNonFunctionalRequirements
-- clarificationQuestions (flat list) AND clarificationGroups grouped by FR name (use the FR names you infer from the text)
+- clarificationQuestions (flat) AND clarificationGroups grouped by inferred FR name
 - improvementSuggestions
 - assumptions
-- stakeholders (name, role, interest, influence, power, communicationFrequency, communicationMethod, raci, owner)
-- risks (description, impact, likelihood, mitigation, category, owner, status — and a functionalRequirementName if you can name the FR it relates to)
 - highlights (exact substring + category ambiguous|missing|risk + note)
 
-Return JSON exactly in this shape (minified):
-{"qualityScore":0,"confidence":0,"scoreBreakdown":{"businessObjective":0,"actorsStakeholders":0,"functionalRequirements":0,"businessRules":0,"validations":0,"workflowCoverage":0,"exceptionHandling":0,"integrations":0,"nonFunctionalRequirements":0,"testability":0},"scoreRationale":{"strengths":["string"],"weaknesses":["string"],"deductions":[{"dimension":"string","points":0,"reason":"string"}]},"ambiguities":[{"term":"string","reason":"string"}],"missingActors":["string"],"missingBusinessRules":["string"],"missingValidations":["string"],"missingWorkflows":["string"],"missingExceptionScenarios":["string"],"missingNonFunctionalRequirements":["string"],"clarificationQuestions":["string"],"clarificationGroups":[{"functionalRequirementName":"string","questions":["string"]}],"improvementSuggestions":["string"],"assumptions":["string"],"stakeholders":[{"name":"string","role":"string","interest":"High","influence":"High","power":"High","communicationFrequency":"string","communicationMethod":"string","raci":"R","owner":"string"}],"risks":[{"description":"string","impact":"High","likelihood":"Medium","mitigation":"string","category":"string","functionalRequirementName":"string","owner":"string","status":"Open"}],"highlights":[{"text":"string","category":"ambiguous","note":"string"}]}`;
+Return JSON (minified):
+{"qualityScore":0,"confidence":0,"scoreBreakdown":{"businessObjective":0,"actorsStakeholders":0,"functionalRequirements":0,"businessRules":0,"validations":0,"workflowCoverage":0,"exceptionHandling":0,"integrations":0,"nonFunctionalRequirements":0,"testability":0},"scoreRationale":{"strengths":["string"],"weaknesses":["string"],"deductions":[{"dimension":"string","points":0,"reason":"string"}]},"ambiguities":[{"term":"string","reason":"string"}],"missingActors":["string"],"missingBusinessRules":["string"],"missingValidations":["string"],"missingWorkflows":["string"],"missingExceptionScenarios":["string"],"missingNonFunctionalRequirements":["string"],"clarificationQuestions":["string"],"clarificationGroups":[{"functionalRequirementName":"string","questions":["string"]}],"improvementSuggestions":["string"],"assumptions":["string"],"highlights":[{"text":"string","category":"ambiguous","note":"string"}]}`;
+
+const PROMPT_B2 = `${BASE_PERSONA}
+
+TASK B2 — STAKEHOLDERS + RISKS.
+
+Identify EVERY stakeholder (internal, external, regulatory, system owners, end users, support, ops) and EVERY risk (business, technical, compliance, security, operational, integration, data, schedule, change-management) the requirement implies. Never cap. For each risk, name the functional requirement it relates to when possible.
+
+Return JSON (minified):
+{"stakeholders":[{"name":"string","role":"string","interest":"High","influence":"High","power":"High","communicationFrequency":"string","communicationMethod":"string","raci":"R","owner":"string"}],"risks":[{"description":"string","impact":"High","likelihood":"Medium","mitigation":"string","category":"string","functionalRequirementName":"string","owner":"string","status":"Open"}]}`;
 
 const PROMPT_C = `${BASE_PERSONA}
 
-TASK C — USER STORY GENERATION FOR A SUBSET OF FRs.
+TASK C — USER STORY GENERATION FOR A BATCH OF FRs.
 
-For EACH provided Functional Requirement, generate 1–3 atomic user stories (more if the FR genuinely needs decomposition; fewer only if trivial). Do NOT cap the count artificially. Every story MUST carry functionalRequirementId equal to its parent FR id (exactly as given). Each story includes: storyId (use the starting index hint provided to make them sequential US-NNN), title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA / iWant / soThat, and acceptanceCriteria with three Gherkin scenarios: happyPath, validation, exception.
+For EACH provided FR, generate 1-4 atomic user stories (more if the FR genuinely needs further decomposition). Never cap. Every story MUST carry functionalRequirementId equal to its parent FR id (exactly as given). Each story includes: storyId, title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA / iWant / soThat, and acceptanceCriteria with three full Gherkin scenarios (happyPath, validation, exception) — each scenario MUST contain Given / When / Then lines.
 
-Return JSON exactly in this shape (minified):
+Return JSON (minified):
 {"userStories":[{"storyId":"US-001","functionalRequirementId":"FR-001","title":"string","priority":"High","businessValue":"string","complexityPoints":5,"asA":"string","iWant":"string","soThat":"string","acceptanceCriteria":{"happyPath":"Given ...\\nWhen ...\\nThen ...","validation":"Given ...\\nWhen ...\\nThen ...","exception":"Given ...\\nWhen ...\\nThen ..."}}]}`;
 
 // ---------- AI call helper ----------
@@ -110,44 +137,41 @@ async function callAI(apiKey: string, systemPrompt: string, userMsg: string): Pr
   }
 }
 
-// ---------- Stage runners ----------
-
 function buildUserMsg(label: string, text: string, title?: string, extra?: string) {
   return `RAW REQUIREMENT (analyze this exact text only):\n"""\n${text}\n"""${
     title ? `\nWorking title: "${title}"` : ""
   }\n\n${label}${extra ? `\n\n${extra}` : ""}`;
 }
 
+// ---------- Stage runners ----------
+
+async function safeCall(apiKey: string, prompt: string, msg: string, label: string) {
+  try { return await callAI(apiKey, prompt, msg); }
+  catch (e) { console.error(`${label} failed:`, (e as Error).message); return null; }
+}
+
 async function runStageC(apiKey: string, text: string, title: string | undefined, frs: any[]) {
   if (!Array.isArray(frs) || frs.length === 0) return [];
-  // Chunk FRs so each story-generation call stays small/fast.
-  const CHUNK = 5;
   const chunks: any[][] = [];
-  for (let i = 0; i < frs.length; i += CHUNK) chunks.push(frs.slice(i, i + CHUNK));
+  for (let i = 0; i < frs.length; i += STORY_CHUNK_SIZE) chunks.push(frs.slice(i, i + STORY_CHUNK_SIZE));
 
-  let storyCursor = 1;
   const results = await Promise.all(
-    chunks.map(async (chunk) => {
-      const startIdx = storyCursor;
-      storyCursor += chunk.length * 3; // reserve a generous range; we re-id at the end
+    chunks.map(async (chunk, idx) => {
       const frList = chunk
         .map((fr) => `- ${fr.id} | ${fr.name} | category=${fr.category ?? ""} | priority=${fr.priority ?? ""}\n  ${fr.description ?? ""}`)
         .join("\n");
-      const extra = `Functional Requirements to cover in THIS batch (generate stories ONLY for these — every story.functionalRequirementId MUST match one of these IDs exactly):\n${frList}\n\nStart numbering storyId at US-${String(startIdx).padStart(3, "0")} (we'll re-sequence later — just keep them unique within this batch).`;
-      const out = await callAI(apiKey, PROMPT_C, buildUserMsg("TASK C INPUT", text, title, extra));
+      const startIdx = idx * STORY_CHUNK_SIZE * 4 + 1;
+      const extra = `Functional Requirements to cover in THIS batch (every story.functionalRequirementId MUST match one of these IDs exactly):\n${frList}\n\nStart storyId numbering at US-${String(startIdx).padStart(3, "0")} (we'll re-sequence later — just keep unique within this batch).`;
+      const out = await safeCall(apiKey, PROMPT_C, buildUserMsg("TASK C INPUT", text, title, extra), `Stage C chunk ${idx}`);
       return Array.isArray(out?.userStories) ? out.userStories : [];
     }),
   );
 
-  // Flatten + re-sequence storyIds across all chunks for global uniqueness.
   const flat = results.flat();
-  return flat.map((s: any, i: number) => ({
-    ...s,
-    storyId: `US-${String(i + 1).padStart(3, "0")}`,
-  }));
+  return flat.map((s: any, i: number) => ({ ...s, storyId: `US-${String(i + 1).padStart(3, "0")}` }));
 }
 
-// ---------- Merging / post-processing ----------
+// ---------- Merging helpers ----------
 
 function mapClarificationGroupsToFRIds(groups: any[], frs: any[]) {
   if (!Array.isArray(groups)) return [];
@@ -209,15 +233,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    const clippedText = text.trim().slice(0, 24_000);
+    const clippedText = text.trim().slice(0, 32_000);
+    const baseMsg = (label: string) => buildUserMsg(label, clippedText, title);
 
-    // --- Stage 1: parallel A + B ---
-    let stageA: any, stageB: any;
+    // --- Stage 1: 5 calls in parallel. A1 is the only one Stage C depends on. ---
+    const a1Promise = callAI(apiKey, PROMPT_A1, baseMsg("TASK A1 INPUT"));
+    const a2Promise = safeCall(apiKey, PROMPT_A2, baseMsg("TASK A2 INPUT"), "A2 BRD");
+    const a3Promise = safeCall(apiKey, PROMPT_A3, baseMsg("TASK A3 INPUT"), "A3 Process Flow");
+    const b1Promise = safeCall(apiKey, PROMPT_B1, baseMsg("TASK B1 INPUT"), "B1 Quality/Gaps");
+    const b2Promise = safeCall(apiKey, PROMPT_B2, baseMsg("TASK B2 INPUT"), "B2 Stakeholders/Risks");
+
+    let stageA1: any;
     try {
-      [stageA, stageB] = await Promise.all([
-        callAI(apiKey, PROMPT_A, buildUserMsg("TASK A INPUT", clippedText, title)),
-        callAI(apiKey, PROMPT_B, buildUserMsg("TASK B INPUT", clippedText, title)),
-      ]);
+      stageA1 = await a1Promise;
     } catch (err) {
       const msg = (err as Error).message ?? "AI request failed.";
       if (msg === "RATE_LIMIT") {
@@ -230,54 +258,56 @@ Deno.serve(async (req) => {
       }
       const aborted = (err as Error)?.name === "AbortError";
       return new Response(JSON.stringify({
-        error: aborted ? "AI analysis timed out. Please shorten the requirement and try again." : "Stage 1 AI request failed.",
+        error: aborted ? "AI decomposition timed out. Please shorten the requirement and try again." : "Decomposition AI call failed.",
         detail: msg,
       }), { status: aborted ? 504 : 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const frs: any[] = stageA?.decomposition?.functionalRequirements ?? [];
+    const frs: any[] = stageA1?.decomposition?.functionalRequirements ?? [];
 
-    // --- Stage 2: stories (chunked, parallel within stage) ---
-    let userStories: any[] = [];
-    try {
-      userStories = await runStageC(apiKey, clippedText, title, frs);
-    } catch (err) {
-      console.error("Stage C failed; returning partial analysis", err);
-      userStories = [];
-    }
+    // Kick off Stage C as soon as we have FRs — runs in parallel with the rest of Stage 1.
+    const cPromise = runStageC(apiKey, clippedText, title, frs).catch((e) => {
+      console.error("Stage C failed:", e);
+      return [] as any[];
+    });
+
+    // Await the remaining Stage 1 + Stage C concurrently.
+    const [stageA2, stageA3, stageB1, stageB2, userStories] = await Promise.all([
+      a2Promise, a3Promise, b1Promise, b2Promise, cPromise,
+    ]);
 
     // --- Merge ---
-    const clarificationGroups = mapClarificationGroupsToFRIds(stageB?.clarificationGroups ?? [], frs);
-    const risks = mapRisksToFRIds(stageB?.risks ?? [], frs);
+    const clarificationGroups = mapClarificationGroupsToFRIds(stageB1?.clarificationGroups ?? [], frs);
+    const risks = mapRisksToFRIds(stageB2?.risks ?? [], frs);
 
-    const sb = (stageB?.scoreBreakdown ?? {}) as Record<string, number>;
+    const sb = (stageB1?.scoreBreakdown ?? {}) as Record<string, number>;
     const sum = Object.values(sb).reduce((a, n) => a + (typeof n === "number" ? n : 0), 0);
-    const qualityScore = sum > 0 ? Math.max(0, Math.min(100, sum)) : (stageB?.qualityScore ?? 0);
+    const qualityScore = sum > 0 ? Math.max(0, Math.min(100, sum)) : (stageB1?.qualityScore ?? 0);
 
     const analysis = {
-      suggestedTitle: stageA?.suggestedTitle ?? title ?? "",
+      suggestedTitle: stageA1?.suggestedTitle ?? title ?? "",
       qualityScore,
-      confidence: stageB?.confidence ?? 0,
-      scoreBreakdown: stageB?.scoreBreakdown ?? {},
-      scoreRationale: stageB?.scoreRationale ?? { strengths: [], weaknesses: [], deductions: [] },
-      ambiguities: stageB?.ambiguities ?? [],
-      missingActors: stageB?.missingActors ?? [],
-      missingBusinessRules: stageB?.missingBusinessRules ?? [],
-      missingValidations: stageB?.missingValidations ?? [],
-      missingWorkflows: stageB?.missingWorkflows ?? [],
-      missingExceptionScenarios: stageB?.missingExceptionScenarios ?? [],
-      missingNonFunctionalRequirements: stageB?.missingNonFunctionalRequirements ?? [],
-      clarificationQuestions: stageB?.clarificationQuestions ?? [],
+      confidence: stageB1?.confidence ?? 0,
+      scoreBreakdown: stageB1?.scoreBreakdown ?? {},
+      scoreRationale: stageB1?.scoreRationale ?? { strengths: [], weaknesses: [], deductions: [] },
+      ambiguities: stageB1?.ambiguities ?? [],
+      missingActors: stageB1?.missingActors ?? [],
+      missingBusinessRules: stageB1?.missingBusinessRules ?? [],
+      missingValidations: stageB1?.missingValidations ?? [],
+      missingWorkflows: stageB1?.missingWorkflows ?? [],
+      missingExceptionScenarios: stageB1?.missingExceptionScenarios ?? [],
+      missingNonFunctionalRequirements: stageB1?.missingNonFunctionalRequirements ?? [],
+      clarificationQuestions: stageB1?.clarificationQuestions ?? [],
       clarificationGroups,
-      improvementSuggestions: stageB?.improvementSuggestions ?? [],
-      decomposition: stageA?.decomposition ?? { businessRequirement: { id: "BR-001", name: "", description: "" }, functionalRequirements: [] },
+      improvementSuggestions: stageB1?.improvementSuggestions ?? [],
+      decomposition: stageA1?.decomposition ?? { businessRequirement: { id: "BR-001", name: "", description: "" }, functionalRequirements: [] },
       userStories,
-      stakeholders: stageB?.stakeholders ?? [],
+      stakeholders: stageB2?.stakeholders ?? [],
       risks,
-      assumptions: stageB?.assumptions ?? [],
-      highlights: stageB?.highlights ?? [],
-      brd: stageA?.brd ?? {},
-      processFlow: stageA?.processFlow ?? {},
+      assumptions: stageB1?.assumptions ?? [],
+      highlights: stageB1?.highlights ?? [],
+      brd: stageA2?.brd ?? {},
+      processFlow: stageA3?.processFlow ?? {},
     };
 
     return new Response(JSON.stringify({ analysis }), {

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "@/lib/store";
+import { ensureDecomposition } from "@/lib/analyzer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +16,7 @@ import {
   Sparkles,
   CheckCircle2,
   FileSearch,
+  Layers,
 } from "lucide-react";
 import {
   Bar,

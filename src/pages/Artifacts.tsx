@@ -610,7 +610,7 @@ export default function Artifacts() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="rtm" className="mt-4"><RtmTab req={req} /></TabsContent>
+          <TabsContent value="rtm" className="mt-4"><RtmTab req={req} requirementIndex={reqIndex} /></TabsContent>
           <TabsContent value="brd" className="mt-4"><BrdTab req={req} /></TabsContent>
           <TabsContent value="flow" className="mt-4"><ProcessFlowTab req={req} /></TabsContent>
         </Tabs>

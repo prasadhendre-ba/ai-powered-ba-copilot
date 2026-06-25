@@ -366,7 +366,20 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { text, title } = await req.json();
+    const rawBody = await req.text();
+    if (!rawBody) {
+      return new Response(JSON.stringify({ error: "Empty request body." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let payload: { text?: string; title?: string };
+    try { payload = JSON.parse(rawBody); }
+    catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON in request body." }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { text, title } = payload;
     if (!text || typeof text !== "string" || text.trim().length < 10) {
       return new Response(JSON.stringify({ error: "Requirement text is too short." }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },

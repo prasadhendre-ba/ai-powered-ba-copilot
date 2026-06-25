@@ -12,8 +12,8 @@ import { toast } from "sonner";
 
 type SortKey = keyof RtmRow;
 
-export function RtmTab({ req }: { req: Requirement }) {
-  const report = useMemo(() => buildRtm(req), [req]);
+export function RtmTab({ req, requirementIndex = 0 }: { req: Requirement; requirementIndex?: number }) {
+  const report = useMemo(() => buildRtm(req, requirementIndex), [req, requirementIndex]);
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");

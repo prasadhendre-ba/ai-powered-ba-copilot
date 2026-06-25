@@ -133,7 +133,19 @@ export default function Analyzer() {
             />
           </div>
 
-          {error && (
+          {loading && (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{LOADING_STAGES[stageIdx]}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This typically takes 20–40 seconds. Please keep this tab open.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && !loading && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{error}</span>

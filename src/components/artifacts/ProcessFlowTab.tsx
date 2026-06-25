@@ -197,6 +197,7 @@ export function ProcessFlowTab({ req }: { req: Requirement }) {
   const ad = req.analysis.processFlow.activityDiagram;
   const narrative = deriveNarrative(ad);
   const filenameBase = `${req.title.replace(/\s+/g, "_")}_activity_diagram`;
+  const svgRef = useRef<SVGSVGElement>(null);
 
   return (
     <div className="space-y-4">
@@ -210,13 +211,13 @@ export function ProcessFlowTab({ req }: { req: Requirement }) {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button size="sm" variant="outline"
-              onClick={() => exportPng(ad.mermaid, `${filenameBase}.png`)
+              onClick={() => exportPng(svgRef.current, `${filenameBase}.png`)
                 .then(() => toast.success("PNG downloaded"))
-                .catch(() => toast.error("Diagram render failed — use PDF export for the narrative"))}>
+                .catch((e) => toast.error(String(e?.message ?? e)))}>
               <ImageIcon className="h-4 w-4 mr-2" /> PNG
             </Button>
             <Button size="sm" variant="outline"
-              onClick={() => exportPdf(ad.mermaid, req.title, narrative)
+              onClick={() => exportPdf(svgRef.current, req.title, narrative)
                 .then(() => toast.success("PDF view opened"))
                 .catch((e) => toast.error(String(e)))}>
               <Printer className="h-4 w-4 mr-2" /> PDF
@@ -246,20 +247,12 @@ export function ProcessFlowTab({ req }: { req: Requirement }) {
       <Card className="shadow-soft border-border/60">
         <CardHeader className="pb-3"><CardTitle className="text-sm">Visual UML Activity Diagram</CardTitle></CardHeader>
         <CardContent>
-          <MermaidDiagram
-            chart={ad.mermaid}
-            id={`activity-${req.id}`}
-            fallback={
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-xs text-muted-foreground mb-3">
-                  Diagram could not render — the narrative above is the authoritative artifact.
-                </p>
-                <NarrativeView narrative={narrative} />
-              </div>
-            }
-          />
+          <div className="overflow-auto p-4 rounded-lg border border-border bg-card">
+            <ActivityDiagramSvg ref={svgRef} diagram={ad} />
+          </div>
         </CardContent>
       </Card>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="shadow-soft border-border/60">

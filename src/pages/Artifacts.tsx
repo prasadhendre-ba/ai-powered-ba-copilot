@@ -132,7 +132,8 @@ export default function Artifacts() {
   const requirements = useStore((s) => s.requirements);
   const deleteRequirement = useStore((s) => s.deleteRequirement);
   const selectedId = params.get("id") ?? requirements[0]?.id;
-  const req = useMemo(() => requirements.find((r) => r.id === selectedId), [requirements, selectedId]);
+  const reqIndex = useMemo(() => requirements.findIndex((r) => r.id === selectedId), [requirements, selectedId]);
+  const req = reqIndex >= 0 ? requirements[reqIndex] : undefined;
   const [tab, setTab] = useState("analysis");
 
   if (!req) {
@@ -609,7 +610,7 @@ export default function Artifacts() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="rtm" className="mt-4"><RtmTab req={req} /></TabsContent>
+          <TabsContent value="rtm" className="mt-4"><RtmTab req={req} requirementIndex={reqIndex} /></TabsContent>
           <TabsContent value="brd" className="mt-4"><BrdTab req={req} /></TabsContent>
           <TabsContent value="flow" className="mt-4"><ProcessFlowTab req={req} /></TabsContent>
         </Tabs>

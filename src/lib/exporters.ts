@@ -182,11 +182,11 @@ export function exportDOCX(req: Requirement) {
 export function exportRtmExcel(req: Requirement, report: RtmReport) {
   const wb = XLSX.utils.book_new();
   const data: (string | number)[][] = [
-    ["Requirement ID", "Requirement Description", "User Story ID", "Acceptance Criteria ID", "Risk ID", "Stakeholder", "Priority", "Status"],
-    ...report.rows.map((r) => [r.requirementId, r.requirementDescription, r.userStoryId, r.acceptanceCriteriaId, r.riskId, r.stakeholder, r.priority, r.status]),
+    ["BR ID", "BR Name", "FR ID", "FR Name", "Category", "User Story", "AC ID", "Risk ID", "Stakeholder", "Priority", "Sprint", "Verification", "Status"],
+    ...report.rows.map((r) => [r.brId, r.brName, r.frId, r.frName, r.frCategory, r.userStoryId, r.acceptanceCriteriaId, r.riskId, r.stakeholder, r.priority, r.sprint ?? "", r.verificationStatus ?? "", r.status]),
   ];
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 10 }, { wch: 20 }];
+  ws["!cols"] = [{ wch: 8 }, { wch: 30 }, { wch: 8 }, { wch: 28 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 10 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "RTM");
 
   const summary = [
@@ -196,7 +196,7 @@ export function exportRtmExcel(req: Requirement, report: RtmReport) {
     ["Total Mappings", report.rows.length],
     ["Traced", report.rows.filter((r) => r.status === "Traced").length],
     ["Orphan Stories", report.orphanStories.join(", ") || "—"],
-    ["Orphan Requirements", report.orphanRequirements.join(", ") || "—"],
+    ["Orphan FRs", report.orphanFrs.join(", ") || "—"],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summary), "Summary");
 
@@ -206,8 +206,10 @@ export function exportRtmExcel(req: Requirement, report: RtmReport) {
 
 export function exportRtmPdf(req: Requirement, report: RtmReport) {
   const rows = report.rows.map((r) => `<tr class="${r.status === "Traced" ? "traced" : "orphan"}">
-    <td>${escapeHtml(r.requirementId)}</td>
-    <td>${escapeHtml(r.requirementDescription)}</td>
+    <td>${escapeHtml(r.brId)}</td>
+    <td>${escapeHtml(r.frId)}</td>
+    <td>${escapeHtml(r.frName)}</td>
+    <td>${escapeHtml(String(r.frCategory))}</td>
     <td>${escapeHtml(r.userStoryId)}</td>
     <td>${escapeHtml(r.acceptanceCriteriaId)}</td>
     <td>${escapeHtml(r.riskId)}</td>
@@ -219,10 +221,10 @@ export function exportRtmPdf(req: Requirement, report: RtmReport) {
   ${brandHeader()}
   <div class="cover"><p class="doc-type">Requirement Traceability Matrix</p><h1>${escapeHtml(req.title)}</h1>
   <p>Generated ${new Date().toLocaleDateString()} · Coverage <strong>${report.coverage}%</strong> · ${report.rows.length} mappings</p></div>
-  <table><tr><th>Req ID</th><th>Requirement</th><th>Story ID</th><th>AC ID</th><th>Risk ID</th><th>Stakeholder</th><th>Priority</th><th>Status</th></tr>${rows}</table>
+  <table><tr><th>BR</th><th>FR</th><th>Functional Requirement</th><th>Category</th><th>Story</th><th>AC</th><th>Risk</th><th>Owner</th><th>Priority</th><th>Status</th></tr>${rows}</table>
   <h2>Orphans</h2>
   <p><strong>Orphan Stories:</strong> ${report.orphanStories.join(", ") || "None"}</p>
-  <p><strong>Orphan Requirements:</strong> ${report.orphanRequirements.join(", ") || "None"}</p>
+  <p><strong>Orphan FRs:</strong> ${report.orphanFrs.join(", ") || "None"}</p>
   ${brandFooter()}
   </body></html>`;
   openPrintWindow(html);

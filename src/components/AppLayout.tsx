@@ -44,8 +44,14 @@ export default function AppLayout() {
             <Outlet />
           </main>
           <footer className="border-t border-border bg-card/60 px-4 md:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-1 text-xs text-muted-foreground">
-            <span>AI BA Copilot Pro © 2026 · AI-Powered Business Analysis Platform</span>
-            <span>Created by <span className="font-medium text-foreground">Prasad Hendre</span> · MBA | Business Analyst</span>
+            <span>
+              <span className="font-semibold text-foreground">AI BA Copilot Pro</span>
+              <span className="mx-1.5">v1.0.0</span>
+              · Enterprise Business Analysis Platform
+            </span>
+            <span>
+              Built by <span className="font-medium text-foreground">Prasad Hendre</span> · © 2026
+            </span>
           </footer>
         </div>
       </div>

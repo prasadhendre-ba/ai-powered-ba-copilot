@@ -138,13 +138,23 @@ export default function Artifacts() {
 
   if (!req) {
     return (
-      <Card className="max-w-md mx-auto mt-12 shadow-soft">
-        <CardContent className="p-8 text-center space-y-4">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
-          <p className="text-muted-foreground">No requirements yet. Analyze your first one.</p>
-          <Button asChild className="bg-gradient-primary">
+      <Card className="max-w-lg mx-auto mt-12 shadow-soft border-border/60 border-dashed">
+        <CardContent className="p-10 text-center space-y-4">
+          <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <FileText className="h-6 w-6 text-primary" />
+          </div>
+          <div className="space-y-1.5">
+            <p className="text-base font-semibold text-foreground">
+              No requirement has been analyzed yet.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Paste a stakeholder requirement into the Requirement Analyzer to generate
+              Business Analysis artifacts.
+            </p>
+          </div>
+          <Button asChild className="bg-gradient-primary shadow-soft">
             <Link to="/analyzer">
-              <Plus className="h-4 w-4 mr-2" /> New Analysis
+              <Plus className="h-4 w-4 mr-2" /> Start New Analysis
             </Link>
           </Button>
         </CardContent>

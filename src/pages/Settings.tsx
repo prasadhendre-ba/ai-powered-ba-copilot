@@ -5,23 +5,30 @@ import { Label } from "@/components/ui/label";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info } from "lucide-react";
+import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info, Users, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const KEY_FEATURES = [
-  "Requirement Quality Assessment",
-  "Ambiguity & Gap Analysis",
-  "Clarification Question Generation",
-  "User Story Generation",
+const SUPPORTED_ARTIFACTS = [
+  "Requirement Quality Analysis",
+  "Business Requirements",
+  "Functional Requirements",
+  "User Stories",
   "Gherkin Acceptance Criteria",
-  "Stakeholder Analysis",
-  "Risk Register Generation",
+  "Stakeholder Matrix",
+  "Risk Register",
   "Business Requirements Document (BRD)",
   "Requirement Traceability Matrix (RTM)",
-  "UML Activity Diagrams",
+  "UML Activity Diagram",
 ];
 
-const DOMAINS = ["Insurance", "Banking", "Financial Services", "E-Commerce"];
+const TARGET_USERS = [
+  "Business Analysts",
+  "Associate Business Analysts",
+  "Product Owners",
+  "Business Consultants",
+  "System Analysts",
+  "Product Managers",
+];
 
 export default function SettingsPage() {
   const { settings, updateSettings, requirements, deleteRequirement } = useStore();

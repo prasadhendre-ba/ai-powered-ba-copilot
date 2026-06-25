@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +10,33 @@ import { Label } from "@/components/ui/label";
 import { Sparkles, Loader2, Lightbulb, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { RawAiAnalysis } from "@/lib/analyzer";
+
+const LOADING_STAGES = [
+  "Analyzing stakeholder requirements…",
+  "Generating Business Requirements…",
+  "Generating Functional Requirements…",
+  "Generating User Stories…",
+  "Building Acceptance Criteria…",
+  "Identifying Stakeholders & Risks…",
+  "Generating BRD…",
+  "Building RTM…",
+  "Generating UML Activity Diagram…",
+  "Finalizing artifacts…",
+];
+
+function friendlyError(raw: string): string {
+  const m = (raw || "").toLowerCase();
+  if (m.includes("rate") || m.includes("429") || m.includes("quota")) {
+    return "The AI service is temporarily busy. Please try again in a moment.";
+  }
+  if (m.includes("network") || m.includes("fetch") || m.includes("timeout")) {
+    return "Network connection interrupted. Please check your connection and try again.";
+  }
+  if (m.includes("unavailable") || m.includes("503") || m.includes("500")) {
+    return "The AI service is temporarily unavailable. Please try again.";
+  }
+  return "Analysis could not be completed. Please try again.";
+}
 
 export default function Analyzer() {
   const [title, setTitle] = useState("");

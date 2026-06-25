@@ -1,13 +1,13 @@
 // Edge function: analyze-requirement
-// Calls Lovable AI Gateway with structured tool-calling to produce a real,
-// requirement-specific Senior Business Analyst analysis including RTM, BRD and Process Flow inputs.
+// Calls Lovable AI Gateway to produce a real, requirement-specific Senior Business Analyst analysis.
+// Keep the model contract compact; large tool schemas were causing 150s idle timeouts in production.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are a Senior Business Analyst with 15+ years of enterprise experience in Banking, Insurance and Financial Services. You produce BRD, FRD, RTM, Process Flow and Agile backlog artifacts.
+const SYSTEM_PROMPT = `You are a Senior Business Analyst with 15+ years of enterprise experience. You produce enterprise-grade BRD, FRD, RTM, Process Flow and Agile backlog artifacts.
 
 Analyze the requirement EXACTLY as written. Reference specific words, phrases, actors, processes, workflows, business rules, validations, integrations and edge cases present in the text. Every ambiguity, risk, question, score deduction, user story, BRD section and process step MUST be traceable to the requirement text.
 
@@ -16,20 +16,20 @@ FIRST, decompose the stakeholder input into atomic enterprise requirements. Trea
 
 Rules:
 - Identify EVERY independent capability, validation, calculation, integration, approval, notification, report, security or audit action implied by the text. Each becomes ONE Functional Requirement.
-- For a typical multi-step enterprise paragraph you should produce 5–15 FRs (use fewer only when the input is genuinely trivial).
+- For a typical multi-step enterprise paragraph produce 4–10 FRs (use fewer only when the input is genuinely trivial).
 - Each FR must be ATOMIC — one verifiable business capability.
 - Classify each FR with a category from this controlled vocabulary: Functional, Business Rule, Validation, Calculation, Integration, Security, Audit, Notification, Reporting, Compliance, Workflow, Approval, Data Requirement, Document Requirement, Performance, Availability, Usability, Accessibility, Error Handling, Logging, API Requirement, Configuration.
 - Return decomposition.businessRequirement = { id: "BR-001", name, description } and decomposition.functionalRequirements = [{ id: "FR-001", name, description, category, priority, businessValue, complexity, businessOwner?, primaryStakeholder?, dependencies[], assumptions[], constraints[], sourceParagraph, status }].
 
 === USER STORY GROUPING ===
-Generate user stories PER Functional Requirement (typically 1–3 stories per FR; complex FRs may have more). Every story MUST carry functionalRequirementId equal to its parent FR id (e.g. "FR-003"). Use storyId values US-001, US-002, … sequential across the whole backlog. Do NOT generate one flat list disconnected from FRs.
+Generate user stories PER Functional Requirement (typically 1–2 stories per FR). Every story MUST carry functionalRequirementId equal to its parent FR id (e.g. "FR-003"). Use storyId values US-001, US-002, … sequential across the whole backlog. Do NOT generate one flat list disconnected from FRs.
 
 === REQUIREMENT QUALITY SCORING (out of 100) ===
 Score 10 dimensions, each 0-10: businessObjective, actorsStakeholders, functionalRequirements, businessRules, validations, workflowCoverage, exceptionHandling, integrations, nonFunctionalRequirements, testability.
 A well-written enterprise requirement that covers objective, actors, workflow, validations, integrations and basic NFRs SHOULD score 85-95. Only deduct for genuine omissions. Record each deduction in scoreRationale.deductions explaining WHY points were deducted. qualityScore = SUM of the 10 dimensions.
 
 === USER STORY DETAIL ===
-Each story: storyId (US-NNN), functionalRequirementId (FR-NNN), title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA/iWant/soThat, and acceptanceCriteria with three Gherkin scenarios (happyPath, validation, exception) — each a single string with Given/When/Then on newlines.
+Each story: storyId (US-NNN), functionalRequirementId (FR-NNN), title, priority, businessValue, complexityPoints (Fibonacci 1/2/3/5/8/13), asA/iWant/soThat, and acceptanceCriteria with three concise Gherkin scenarios (happyPath, validation, exception).
 
 === CLARIFICATION QUESTIONS — GROUPED ===
 Provide clarificationQuestions as a flat list (4-10 items) AND clarificationGroups as an array of { functionalRequirementId, functionalRequirementName, questions[] } so questions can be displayed beneath their parent FR.
@@ -41,7 +41,7 @@ Each stakeholder: name, role, interest, influence, plus optional power, communic
 Each risk: description, impact, likelihood, mitigation, optional category, optional functionalRequirementId (FR-NNN it relates to), optional userStoryId, optional owner, optional status.
 
 === BRD ===
-Produce a complete brd object: executiveSummary, businessObjective, problemStatement, currentState, futureState, inScope[5-10], outOfScope[3-7], constraints[3-7], businessRules[5-10], dependencies[3-7], successMetrics[3-7].
+Produce a concise brd object: executiveSummary, businessObjective, problemStatement, currentState, futureState, inScope[3-6], outOfScope[2-4], constraints[2-4], businessRules[3-6], dependencies[2-4], successMetrics[2-4].
 
 === PROCESS FLOW + UML ACTIVITY DIAGRAM ===
 Produce processFlow with both a business process flow view and an activityDiagram view. Each activity step should, where possible, trace to an FR. Use the narrative format: ["Start", "→ <step>", "Decision:", "<question?>", "Yes", "→ ...", "No", "→ ...", "End"]. Provide a syntactically simple mermaid flowchart TD as a fallback.
@@ -55,8 +55,28 @@ Produce processFlow with both a business process flow view and an activityDiagra
 - 3-7 stakeholders
 - highlights: exact substrings + category (ambiguous|missing|risk) + note
 
-Stay grounded in the user's exact wording. Output enterprise-grade artifacts with strict traceability BR → FR → US → AC → Risk.`;
+Stay grounded in the user's exact wording. Output enterprise-grade artifacts with strict traceability BR → FR → US → AC → Risk.
 
+Return ONLY valid minified JSON matching the requested shape. No markdown. No code fences.`;
+
+const RESPONSE_SHAPE = `{
+"suggestedTitle":"string",
+"qualityScore":0,
+"confidence":0,
+"scoreBreakdown":{"businessObjective":0,"actorsStakeholders":0,"functionalRequirements":0,"businessRules":0,"validations":0,"workflowCoverage":0,"exceptionHandling":0,"integrations":0,"nonFunctionalRequirements":0,"testability":0},
+"scoreRationale":{"strengths":["string"],"weaknesses":["string"],"deductions":[{"dimension":"string","points":0,"reason":"string"}]},
+"ambiguities":[{"term":"exact substring","reason":"string"}],
+"missingActors":["string"],"missingBusinessRules":["string"],"missingValidations":["string"],"missingWorkflows":["string"],"missingExceptionScenarios":["string"],"missingNonFunctionalRequirements":["string"],
+"clarificationQuestions":["string"],"clarificationGroups":[{"functionalRequirementId":"FR-001","functionalRequirementName":"string","questions":["string"]}],
+"improvementSuggestions":["string"],
+"decomposition":{"businessRequirement":{"id":"BR-001","name":"string","description":"string"},"functionalRequirements":[{"id":"FR-001","name":"string","description":"string","category":"Functional","priority":"High","businessValue":"string","complexity":"Medium","businessOwner":"string","primaryStakeholder":"string","dependencies":["string"],"assumptions":["string"],"constraints":["string"],"sourceParagraph":"string","status":"Draft"}]},
+"userStories":[{"storyId":"US-001","functionalRequirementId":"FR-001","title":"string","priority":"High","businessValue":"string","complexityPoints":5,"asA":"string","iWant":"string","soThat":"string","acceptanceCriteria":{"happyPath":"Given ...\\nWhen ...\\nThen ...","validation":"Given ...\\nWhen ...\\nThen ...","exception":"Given ...\\nWhen ...\\nThen ..."}}],
+"stakeholders":[{"name":"string","role":"string","interest":"High","influence":"High","power":"High","communicationFrequency":"string","communicationMethod":"string","raci":"R","owner":"string"}],
+"risks":[{"description":"string","impact":"High","likelihood":"Medium","mitigation":"string","category":"string","functionalRequirementId":"FR-001","userStoryId":"US-001","owner":"string","status":"Open"}],
+"assumptions":["string"],"highlights":[{"text":"exact substring","category":"ambiguous","note":"string"}],
+"brd":{"executiveSummary":"string","businessObjective":"string","problemStatement":"string","currentState":"string","futureState":"string","inScope":["string"],"outOfScope":["string"],"constraints":["string"],"businessRules":["string"],"dependencies":["string"],"successMetrics":["string"]},
+"processFlow":{"actors":["string"],"activities":["string"],"decisionPoints":[{"question":"string","yesPath":"string","noPath":"string"}],"systemActions":["string"],"integrations":["string"],"endStates":["string"],"textFlow":["Start","→ step","Decision:","question?","Yes","→ step","No","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))","activityDiagram":{"startNode":"Start","endNodes":["End"],"activities":["string"],"decisions":[{"question":"string","yesPath":"string","noPath":"string"}],"alternatePaths":["string"],"exceptionPaths":["string"],"actorActions":[{"actor":"string","action":"string"}],"systemActions":["string"],"integrationPoints":["string"],"textActivityFlow":["Start","→ step","End"],"narrative":["Start","→ step","End"],"mermaid":"flowchart TD\\nStart((Start)) --> A[Activity]\\nA --> End((End))"}}
+}`;
 const analysisTool = {
   type: "function",
   function: {
@@ -393,27 +413,32 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userMsg = `RAW REQUIREMENT (analyze this exact text, nothing else):\n"""\n${text.trim()}\n"""\n\n${
+    const clippedText = text.trim().slice(0, 18_000);
+    const userMsg = `RAW REQUIREMENT (analyze this exact text, nothing else):\n"""\n${clippedText}\n"""\n\n${
       title ? `Working title provided by user: "${title}"\n` : ""
-    }Call submit_requirement_analysis with your full analysis: scoring, decomposed user stories (8-20), risks, stakeholders, assumptions, complete BRD sections, and a process flow (text + mermaid). Every field must reference this exact text.`;
+    }Return compact JSON only. Match this shape exactly and keep every item traceable to the provided requirement text:\n${RESPONSE_SHAPE}`;
 
     const ac = new AbortController();
-    const timeoutMs = 140_000;
+    const timeoutMs = 85_000;
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     let aiRes: Response;
     try {
       aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Lovable-API-Key": apiKey,
+          "X-Lovable-AIG-SDK": "vercel-ai-sdk",
+        },
         signal: ac.signal,
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash-lite",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: userMsg },
           ],
-          tools: [analysisTool],
-          tool_choice: { type: "function", function: { name: "submit_requirement_analysis" } },
+          response_format: { type: "json_object" },
+          temperature: 0.2,
         }),
       });
     } catch (err) {
@@ -449,6 +474,24 @@ Deno.serve(async (req) => {
       console.error("AI gateway non-JSON response", aiRaw.slice(0, 500));
       return new Response(JSON.stringify({ error: "AI gateway returned a non-JSON response." }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content === "string" && content.trim()) {
+      let parsed: Record<string, unknown>;
+      try { parsed = JSON.parse(content); }
+      catch {
+        console.error("AI gateway malformed JSON content", content.slice(0, 500));
+        return new Response(JSON.stringify({ error: "AI returned malformed JSON analysis." }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const sb = (parsed.scoreBreakdown ?? {}) as Record<string, number>;
+      const sum = Object.values(sb).reduce((a, n) => a + (typeof n === "number" ? n : 0), 0);
+      if (sum > 0) parsed.qualityScore = Math.max(0, Math.min(100, sum));
+
+      return new Response(JSON.stringify({ analysis: parsed }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const call = data?.choices?.[0]?.message?.tool_calls?.[0];
     const finishReason = data?.choices?.[0]?.finish_reason;
     if (!call?.function?.arguments) {

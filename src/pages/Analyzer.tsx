@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,19 +11,56 @@ import { Sparkles, Loader2, Lightbulb, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { RawAiAnalysis } from "@/lib/analyzer";
 
+const LOADING_STAGES = [
+  "Analyzing stakeholder requirements…",
+  "Generating Business Requirements…",
+  "Generating Functional Requirements…",
+  "Generating User Stories…",
+  "Building Acceptance Criteria…",
+  "Identifying Stakeholders & Risks…",
+  "Generating BRD…",
+  "Building RTM…",
+  "Generating UML Activity Diagram…",
+  "Finalizing artifacts…",
+];
+
+function friendlyError(raw: string): string {
+  const m = (raw || "").toLowerCase();
+  if (m.includes("rate") || m.includes("429") || m.includes("quota")) {
+    return "The AI service is temporarily busy. Please try again in a moment.";
+  }
+  if (m.includes("network") || m.includes("fetch") || m.includes("timeout")) {
+    return "Network connection interrupted. Please check your connection and try again.";
+  }
+  if (m.includes("unavailable") || m.includes("503") || m.includes("500")) {
+    return "The AI service is temporarily unavailable. Please try again.";
+  }
+  return "Analysis could not be completed. Please try again.";
+}
+
 export default function Analyzer() {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [stageIdx, setStageIdx] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const addRequirementFromAi = useStore((s) => s.addRequirementFromAi);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading) return;
+    setStageIdx(0);
+    const id = setInterval(() => {
+      setStageIdx((i) => Math.min(i + 1, LOADING_STAGES.length - 1));
+    }, 2200);
+    return () => clearInterval(id);
+  }, [loading]);
 
   const handleAnalyze = async () => {
     setError(null);
     const trimmed = text.trim();
     if (trimmed.length < 20) {
-      toast.error("Please enter at least 20 characters of requirement text");
+      toast.error("Please enter at least 20 characters of requirement text.");
       return;
     }
     setLoading(true);
@@ -37,14 +74,14 @@ export default function Analyzer() {
       }
       const raw = (data as { analysis: RawAiAnalysis }).analysis;
       const req = addRequirementFromAi(title.trim(), trimmed, raw);
-      toast.success("AI analysis complete", {
+      toast.success("Analysis complete", {
         description: `Quality ${req.analysis.qualityScore}/100 · Confidence ${req.analysis.confidence}%`,
       });
       navigate(`/artifacts?id=${req.id}`);
     } catch (e) {
-      const msg = (e as Error).message || "Unexpected error";
-      setError(msg);
-      toast.error("Analysis failed", { description: msg });
+      const friendly = friendlyError((e as Error).message);
+      setError(friendly);
+      toast.error("Analysis could not be completed", { description: friendly });
     } finally {
       setLoading(false);
     }
@@ -96,7 +133,19 @@ export default function Analyzer() {
             />
           </div>
 
-          {error && (
+          {loading && (
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <Loader2 className="h-5 w-5 text-primary animate-spin shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{LOADING_STAGES[stageIdx]}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This typically takes 20–40 seconds. Please keep this tab open.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {error && !loading && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{error}</span>

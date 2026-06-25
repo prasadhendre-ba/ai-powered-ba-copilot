@@ -63,8 +63,13 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:hidden">
         <div className="rounded-lg bg-sidebar-accent p-3">
-          <p className="text-xs font-medium text-sidebar-foreground">Enterprise Plan</p>
-          <p className="text-[11px] text-sidebar-foreground/70 mt-1">Unlimited analyses · Priority support</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-sidebar-foreground">Version 1.0.0</p>
+            <span className="text-[10px] font-medium text-success bg-success/10 px-1.5 py-0.5 rounded">
+              Production
+            </span>
+          </div>
+          <p className="text-[11px] text-sidebar-foreground/70 mt-1">Built by Prasad Hendre · © 2026</p>
         </div>
       </SidebarFooter>
     </Sidebar>

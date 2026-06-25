@@ -5,23 +5,30 @@ import { Label } from "@/components/ui/label";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info } from "lucide-react";
+import { Building2, FileDown, Sliders, Trash2, Sparkles, CheckCircle2, User, Info, Users, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const KEY_FEATURES = [
-  "Requirement Quality Assessment",
-  "Ambiguity & Gap Analysis",
-  "Clarification Question Generation",
-  "User Story Generation",
+const SUPPORTED_ARTIFACTS = [
+  "Requirement Quality Analysis",
+  "Business Requirements",
+  "Functional Requirements",
+  "User Stories",
   "Gherkin Acceptance Criteria",
-  "Stakeholder Analysis",
-  "Risk Register Generation",
+  "Stakeholder Matrix",
+  "Risk Register",
   "Business Requirements Document (BRD)",
   "Requirement Traceability Matrix (RTM)",
-  "UML Activity Diagrams",
+  "UML Activity Diagram",
 ];
 
-const DOMAINS = ["Insurance", "Banking", "Financial Services", "E-Commerce"];
+const TARGET_USERS = [
+  "Business Analysts",
+  "Associate Business Analysts",
+  "Product Owners",
+  "Business Consultants",
+  "System Analysts",
+  "Product Managers",
+];
 
 export default function SettingsPage() {
   const { settings, updateSettings, requirements, deleteRequirement } = useStore();
@@ -41,16 +48,21 @@ export default function SettingsPage() {
           </div>
         </div>
         <CardContent className="p-6 space-y-6">
-          <p className="text-sm text-foreground leading-relaxed">
-            AI BA Copilot Pro is an AI-powered Business Analysis platform designed to
-            help Business Analysts transform raw stakeholder requirements into
-            structured, traceable, and enterprise-ready BA deliverables.
-          </p>
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+              Mission
+            </h3>
+            <p className="text-sm text-foreground leading-relaxed">
+              AI BA Copilot Pro is an AI-powered Business Analysis platform that
+              transforms raw stakeholder requirements into enterprise Business
+              Analysis artifacts.
+            </p>
+          </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Key Features</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">Supported Artifacts</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              {KEY_FEATURES.map((f) => (
+              {SUPPORTED_ARTIFACTS.map((f) => (
                 <div key={f} className="flex items-center gap-2 text-sm text-foreground">
                   <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                   <span>{f}</span>
@@ -60,9 +72,11 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Supported Domains</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Target Users
+            </h3>
             <div className="flex flex-wrap gap-2">
-              {DOMAINS.map((d) => (
+              {TARGET_USERS.map((d) => (
                 <span
                   key={d}
                   className="inline-flex items-center rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-medium"
@@ -70,6 +84,28 @@ export default function SettingsPage() {
                   {d}
                 </span>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <div className="flex items-start gap-2.5">
+              <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <div className="space-y-1.5">
+                <p className="text-sm font-semibold text-foreground">Known Limitations</p>
+                <ul className="text-xs text-muted-foreground space-y-1 leading-relaxed list-disc pl-4">
+                  <li>
+                    Version 1.0 is optimized for small to medium stakeholder requirement documents.
+                  </li>
+                  <li>
+                    Very large enterprise requirement documents may be analyzed more effectively when
+                    divided into logical business modules.
+                  </li>
+                  <li>
+                    All generated Business Analysis artifacts should be reviewed by Business Analysts
+                    before implementation.
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -166,11 +202,19 @@ export default function SettingsPage() {
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wider text-muted-foreground">Version</dt>
-              <dd className="font-medium text-foreground">1.0</dd>
+              <dd className="font-medium text-foreground">1.0.0</dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Release Date</dt>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Status</dt>
+              <dd className="font-medium text-success">Production Ready</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Release</dt>
               <dd className="font-medium text-foreground">June 2026</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-muted-foreground">Built By</dt>
+              <dd className="font-medium text-foreground">Prasad Hendre</dd>
             </div>
           </dl>
         </CardContent>

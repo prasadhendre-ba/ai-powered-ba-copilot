@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useStore } from "@/lib/store";
+import { ensureDecomposition } from "@/lib/analyzer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +16,7 @@ import {
   Sparkles,
   CheckCircle2,
   FileSearch,
+  Layers,
 } from "lucide-react";
 import {
   Bar,
@@ -138,7 +140,23 @@ export default function Dashboard() {
     );
     const stories = requirements.reduce((a, r) => a + r.analysis.userStories.length, 0);
     const risks = requirements.reduce((a, r) => a + r.analysis.risks.length, 0);
-    return { avgScore, gaps, stories, risks };
+    const brs = requirements.length;
+    let frs = 0, acs = 0, stakeholders = 0;
+    let businessRules = 0, validations = 0, integrations = 0;
+    for (const r of requirements) {
+      const d = ensureDecomposition(r.analysis);
+      frs += d.functionalRequirements.length;
+      stakeholders += r.analysis.stakeholders.length;
+      businessRules += d.functionalRequirements.filter((f) => String(f.category) === "Business Rule").length;
+      validations += d.functionalRequirements.filter((f) => String(f.category) === "Validation").length;
+      integrations += d.functionalRequirements.filter((f) => String(f.category) === "Integration").length;
+      for (const s of r.analysis.userStories) {
+        if (s.acceptanceCriteria?.happyPath?.trim()) acs++;
+        if (s.acceptanceCriteria?.validation?.trim()) acs++;
+        if (s.acceptanceCriteria?.exception?.trim()) acs++;
+      }
+    }
+    return { avgScore, gaps, stories, risks, brs, frs, acs, stakeholders, businessRules, validations, integrations };
   }, [requirements]);
 
   const chartData = requirements
@@ -219,6 +237,37 @@ export default function Dashboard() {
               </Card>
             ))}
           </div>
+
+          <Card className="shadow-soft border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" /> Requirement Breakdown
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Hierarchical decomposition across all projects</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                  { label: "Business Reqs", value: metrics.brs },
+                  { label: "Functional Reqs", value: metrics.frs },
+                  { label: "User Stories", value: metrics.stories },
+                  { label: "Acceptance Criteria", value: metrics.acs },
+                  { label: "Stakeholders", value: metrics.stakeholders },
+                  { label: "Business Rules", value: metrics.businessRules },
+                  { label: "Validation Rules", value: metrics.validations },
+                  { label: "Integrations", value: metrics.integrations },
+                  { label: "Risks", value: metrics.risks },
+                  { label: "Avg Quality", value: `${metrics.avgScore}/100` },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-lg border border-border/60 bg-card p-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                    <p className="text-xl font-bold mt-1 text-foreground">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 shadow-soft border-border/60">

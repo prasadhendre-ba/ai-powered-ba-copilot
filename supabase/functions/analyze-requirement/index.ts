@@ -397,19 +397,39 @@ Deno.serve(async (req) => {
       title ? `Working title provided by user: "${title}"\n` : ""
     }Call submit_requirement_analysis with your full analysis: scoring, decomposed user stories (8-20), risks, stakeholders, assumptions, complete BRD sections, and a process flow (text + mermaid). Every field must reference this exact text.`;
 
-    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userMsg },
-        ],
-        tools: [analysisTool],
-        tool_choice: { type: "function", function: { name: "submit_requirement_analysis" } },
-      }),
-    });
+    const ac = new AbortController();
+    const timeoutMs = 140_000;
+    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    let aiRes: Response;
+    try {
+      aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        signal: ac.signal,
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-lite",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: userMsg },
+          ],
+          tools: [analysisTool],
+          tool_choice: { type: "function", function: { name: "submit_requirement_analysis" } },
+        }),
+      });
+    } catch (err) {
+      clearTimeout(timer);
+      const aborted = (err as Error)?.name === "AbortError";
+      return new Response(
+        JSON.stringify({
+          error: aborted
+            ? "AI analysis timed out. Please shorten the requirement and try again."
+            : "AI gateway request failed.",
+          detail: (err as Error)?.message,
+        }),
+        { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    clearTimeout(timer);
 
     if (aiRes.status === 429) return new Response(JSON.stringify({ error: "Rate limit reached. Please try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (aiRes.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in workspace settings." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });

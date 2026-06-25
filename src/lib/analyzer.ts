@@ -293,9 +293,26 @@ const AC_SUFFIX = [
   { key: "exception" as const, suffix: "EX" },
 ];
 
-export function buildRtm(req: Requirement): RtmReport {
+/**
+ * Generates a requirement ID with sequential numbering.
+ * @param index - The zero-based index of the requirement (0 = REQ-001, 1 = REQ-002, etc.)
+ * @returns Formatted requirement ID string
+ */
+function generateRequirementId(index: number): string {
+  const paddedNumber = String(index + 1).padStart(3, "0");
+  return `REQ-${paddedNumber}`;
+}
+
+/**
+ * Builds the RTM (Requirements Traceability Matrix) report for a single requirement.
+ * Generates sequential requirement IDs based on the requirement index.
+ * @param req - The requirement to trace
+ * @param requirementIndex - The zero-based index of this requirement in the collection (for unique ID generation)
+ * @returns RTM report with traced relationships
+ */
+export function buildRtm(req: Requirement, requirementIndex: number = 0): RtmReport {
   const a = req.analysis;
-  const reqId = "REQ-001";
+  const reqId = generateRequirementId(requirementIndex);
   const reqDesc = req.title;
   const stories = a.userStories;
   const risks = a.risks;

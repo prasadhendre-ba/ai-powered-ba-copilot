@@ -101,11 +101,11 @@ function EmptyState() {
           <FileSearch className="h-6 w-6 text-primary" />
         </div>
         <h3 className="mt-4 text-lg font-semibold text-foreground">
-          No requirement analysis has been performed yet.
+          No requirement has been analyzed yet.
         </h3>
         <p className="mt-1.5 text-sm text-muted-foreground max-w-md mx-auto">
-          Begin by analyzing your first stakeholder requirement to unlock dashboards,
-          artifacts, and traceability.
+          Paste a stakeholder requirement into the Requirement Analyzer to generate
+          Business Analysis artifacts.
         </p>
         <Button asChild className="mt-5 bg-gradient-primary shadow-soft">
           <Link to="/analyzer">

@@ -45,22 +45,28 @@ export const useStore = create<AppState>()(
     }),
     {
       name: "ba-copilot-store",
-      version: 5,
+      version: 6,
       migrate: (persisted: unknown, version) => {
         if (!persisted || typeof persisted !== "object") return persisted as AppState;
-        // v4 dropped legacy analyses; v5 removed notifications + rebranded org default.
+        // v4 dropped legacy analyses; v5 removed notifications + rebranded org default;
+        // v6 (v1.0 production release) clears historical test/demo analyses so every
+        // workspace starts in the professional empty state.
         if (version < 4) {
           return { ...(persisted as object), requirements: [] } as AppState;
         }
+        let next = persisted as Record<string, unknown>;
         if (version < 5) {
-          const p = persisted as { settings?: Record<string, unknown> };
+          const p = next as { settings?: Record<string, unknown> };
           const { notifications: _drop, organization, ...restSettings } = (p.settings ?? {}) as Record<string, unknown>;
           const org = (typeof organization === "string" && organization && organization !== "Acme Corp")
             ? organization
             : "AI BA Copilot Pro Workspace";
-          return { ...p, settings: { ...restSettings, organization: org } } as unknown as AppState;
+          next = { ...p, settings: { ...restSettings, organization: org } };
         }
-        return persisted as AppState;
+        if (version < 6) {
+          next = { ...next, requirements: [] };
+        }
+        return next as unknown as AppState;
       },
     }
   )

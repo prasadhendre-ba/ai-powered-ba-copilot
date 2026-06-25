@@ -238,6 +238,37 @@ export default function Dashboard() {
             ))}
           </div>
 
+          <Card className="shadow-soft border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" /> Requirement Breakdown
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Hierarchical decomposition across all projects</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {[
+                  { label: "Business Reqs", value: metrics.brs },
+                  { label: "Functional Reqs", value: metrics.frs },
+                  { label: "User Stories", value: metrics.stories },
+                  { label: "Acceptance Criteria", value: metrics.acs },
+                  { label: "Stakeholders", value: metrics.stakeholders },
+                  { label: "Business Rules", value: metrics.businessRules },
+                  { label: "Validation Rules", value: metrics.validations },
+                  { label: "Integrations", value: metrics.integrations },
+                  { label: "Risks", value: metrics.risks },
+                  { label: "Avg Quality", value: `${metrics.avgScore}/100` },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-lg border border-border/60 bg-card p-3">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                    <p className="text-xl font-bold mt-1 text-foreground">{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 shadow-soft border-border/60">
               <CardHeader className="flex flex-row items-center justify-between">

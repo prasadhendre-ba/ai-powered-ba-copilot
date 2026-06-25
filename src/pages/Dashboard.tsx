@@ -140,7 +140,23 @@ export default function Dashboard() {
     );
     const stories = requirements.reduce((a, r) => a + r.analysis.userStories.length, 0);
     const risks = requirements.reduce((a, r) => a + r.analysis.risks.length, 0);
-    return { avgScore, gaps, stories, risks };
+    const brs = requirements.length;
+    let frs = 0, acs = 0, stakeholders = 0;
+    let businessRules = 0, validations = 0, integrations = 0;
+    for (const r of requirements) {
+      const d = ensureDecomposition(r.analysis);
+      frs += d.functionalRequirements.length;
+      stakeholders += r.analysis.stakeholders.length;
+      businessRules += d.functionalRequirements.filter((f) => String(f.category) === "Business Rule").length;
+      validations += d.functionalRequirements.filter((f) => String(f.category) === "Validation").length;
+      integrations += d.functionalRequirements.filter((f) => String(f.category) === "Integration").length;
+      for (const s of r.analysis.userStories) {
+        if (s.acceptanceCriteria?.happyPath?.trim()) acs++;
+        if (s.acceptanceCriteria?.validation?.trim()) acs++;
+        if (s.acceptanceCriteria?.exception?.trim()) acs++;
+      }
+    }
+    return { avgScore, gaps, stories, risks, brs, frs, acs, stakeholders, businessRules, validations, integrations };
   }, [requirements]);
 
   const chartData = requirements

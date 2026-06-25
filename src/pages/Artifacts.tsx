@@ -609,94 +609,228 @@ export default function Artifacts() {
             </div>
           </TabsContent>
 
-          <TabsContent value="stories" className="space-y-6 mt-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {a.userStories.length} stories across {decomp.functionalRequirements.length} functional requirements ·{" "}
-                {a.userStories.reduce((sum, s) => sum + (s.complexityPoints ?? 0), 0)} total story points
-              </p>
-            </div>
-            {decomp.functionalRequirements.map((fr) => {
-              const linkedStories = storiesByFr.get(fr.id) ?? [];
-              if (!linkedStories.length) return null;
-              return (
-                <div key={fr.id} className="space-y-3">
-                  <div className="flex items-center gap-2 flex-wrap border-l-4 border-primary pl-3 py-1 bg-accent/30 rounded-r">
-                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary text-primary-foreground">{fr.id}</span>
-                    <span className="text-sm font-semibold">{fr.name}</span>
-                    <Badge variant="secondary" className="text-[10px]">{String(fr.category)}</Badge>
-                    <span className="text-xs text-muted-foreground ml-auto">{linkedStories.length} {linkedStories.length === 1 ? "story" : "stories"}</span>
-                  </div>
-                  {linkedStories.map((s) => {
-                    const acRows: { label: string; id: string; gherkin: string }[] = [
-                      { label: "Happy Path", id: `AC-${s.storyId}-01`, gherkin: s.acceptanceCriteria?.happyPath ?? "" },
-                      { label: "Validation Scenario", id: `AC-${s.storyId}-02`, gherkin: s.acceptanceCriteria?.validation ?? "" },
-                      { label: "Exception Scenario", id: `AC-${s.storyId}-03`, gherkin: s.acceptanceCriteria?.exception ?? "" },
-                    ];
-                    return (
-                      <Card key={s.id} className="shadow-soft border-border/60 ml-2">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-start justify-between gap-3 flex-wrap">
-                            <div className="min-w-0">
-                              <CardTitle className="text-sm flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs px-2 py-0.5 rounded bg-primary/10 text-primary">{s.storyId}</span>
-                                <span>{s.title}</span>
-                                <span className="font-mono text-[10px] text-muted-foreground">↳ {fr.id}</span>
-                              </CardTitle>
-                              <p className="text-xs text-muted-foreground mt-1.5">{s.businessValue}</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
-                              <Badge variant="secondary" className="font-mono">{s.complexityPoints} pts</Badge>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="p-4 rounded-lg bg-accent/40 border border-border space-y-1 text-sm">
-                            <p><span className="font-semibold text-primary">As a</span> {s.asA},</p>
-                            <p><span className="font-semibold text-primary">I want</span> {s.iWant},</p>
-                            <p><span className="font-semibold text-primary">so that</span> {s.soThat}.</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                              Acceptance Criteria (Gherkin)
-                            </p>
-                            <div className="space-y-3">
-                              {acRows.map((r) => (
-                                <div key={r.label}>
-                                  <p className="text-[11px] font-semibold text-primary mb-1 flex items-center gap-2">
-                                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10">{r.id}</span>
-                                    {r.label}
-                                  </p>
-                                  <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
-{r.gherkin}
-                                  </pre>
+          <TabsContent value="stories" className="space-y-4 mt-4">
+            {/* Hierarchy summary bar */}
+            <Card className="shadow-soft border-border/60 bg-gradient-subtle">
+              <CardContent className="p-4 flex flex-wrap items-center gap-3 text-xs">
+                <span className="font-mono px-2 py-1 rounded bg-primary text-primary-foreground">
+                  {decomp.businessRequirement.id}
+                </span>
+                <span className="font-semibold text-foreground">{decomp.businessRequirement.name}</span>
+                <span className="text-muted-foreground">›</span>
+                <Badge variant="secondary">{decomp.functionalRequirements.length} Functional Requirements</Badge>
+                <Badge variant="secondary">{a.userStories.length} User Stories</Badge>
+                <Badge variant="secondary">
+                  {a.userStories.reduce((sum, s) => sum + (s.complexityPoints ?? 0), 0)} Story Points
+                </Badge>
+                <Badge variant="secondary">
+                  {a.userStories.length * 3} Acceptance Criteria
+                </Badge>
+              </CardContent>
+            </Card>
+
+            {/* BR collapsible */}
+            <details open className="group rounded-xl border border-border bg-card shadow-soft overflow-hidden">
+              <summary className="cursor-pointer list-none p-4 flex items-center gap-3 bg-primary/5 hover:bg-primary/10 transition">
+                <span className="text-primary text-xs transition-transform group-open:rotate-90">▶</span>
+                <span className="font-mono text-xs px-2 py-1 rounded bg-primary text-primary-foreground">
+                  {decomp.businessRequirement.id}
+                </span>
+                <span className="font-semibold text-foreground">{decomp.businessRequirement.name}</span>
+                <Badge variant="outline" className="ml-auto">Business Requirement</Badge>
+              </summary>
+
+              <div className="p-4 space-y-4 bg-background">
+                {decomp.functionalRequirements.map((fr) => {
+                  const linkedStories = storiesByFr.get(fr.id) ?? [];
+                  const frRisks = a.risks.filter((r) => r.functionalRequirementId === fr.id);
+                  const frStakeholders = [fr.businessOwner, fr.primaryStakeholder].filter(Boolean) as string[];
+                  return (
+                    <details key={fr.id} open className="group/fr rounded-lg border border-border bg-card overflow-hidden">
+                      <summary className="cursor-pointer list-none p-3 flex items-center gap-2 flex-wrap bg-accent/40 hover:bg-accent/60 transition">
+                        <span className="text-primary text-[10px] transition-transform group-open/fr:rotate-90">▶</span>
+                        <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-primary/15 text-primary">{fr.id}</span>
+                        <span className="text-sm font-semibold text-foreground">{fr.name}</span>
+                        <Badge variant="secondary" className="text-[10px]">{String(fr.category)}</Badge>
+                        <Badge variant="outline" className={`text-[10px] ${priorityColor[fr.priority]}`}>{fr.priority}</Badge>
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                          {linkedStories.length} {linkedStories.length === 1 ? "story" : "stories"}
+                        </span>
+                      </summary>
+
+                      <div className="p-4 space-y-3">
+                        {linkedStories.length === 0 && (
+                          <p className="text-xs text-muted-foreground italic">No user stories generated for this FR.</p>
+                        )}
+                        {linkedStories.map((s) => {
+                          const storyRisks = a.risks.filter(
+                            (r) => r.userStoryId === s.storyId || (r.functionalRequirementId === fr.id && !r.userStoryId)
+                          );
+                          const acRows = [
+                            { label: "Happy Path", id: `AC-${s.storyId}-01`, gherkin: s.acceptanceCriteria?.happyPath ?? "" },
+                            { label: "Validation", id: `AC-${s.storyId}-02`, gherkin: s.acceptanceCriteria?.validation ?? "" },
+                            { label: "Exception", id: `AC-${s.storyId}-03`, gherkin: s.acceptanceCriteria?.exception ?? "" },
+                          ];
+                          const bvTone =
+                            s.priority === "High" ? "bg-destructive/10 text-destructive border-destructive/20"
+                            : s.priority === "Medium" ? "bg-warning/10 text-warning border-warning/20"
+                            : "bg-muted text-muted-foreground border-border";
+                          return (
+                            <details key={s.id} open className="group/us rounded-xl border border-border bg-gradient-to-br from-card to-accent/10 shadow-soft overflow-hidden">
+                              <summary className="cursor-pointer list-none p-4 hover:bg-accent/30 transition">
+                                <div className="flex items-start justify-between gap-3 flex-wrap">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap text-[10px] font-mono text-muted-foreground mb-1.5">
+                                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">{decomp.businessRequirement.id}</span>
+                                      <span>›</span>
+                                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">{fr.id}</span>
+                                      <span>›</span>
+                                      <span className="px-1.5 py-0.5 rounded bg-primary text-primary-foreground">{s.storyId}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-primary text-[10px] transition-transform group-open/us:rotate-90">▶</span>
+                                      <h4 className="text-base font-semibold text-foreground">{s.title}</h4>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Badge variant="outline" className={priorityColor[s.priority]}>{s.priority}</Badge>
+                                    <Badge variant="secondary" className="font-mono text-[10px]">{s.complexityPoints} pts</Badge>
+                                    <Badge variant="outline" className={`text-[10px] ${bvTone}`}>Value: {s.priority}</Badge>
+                                    <Badge variant="outline" className="text-[10px]">{String(fr.category)}</Badge>
+                                    <Badge variant="outline" className="text-[10px]">{fr.status}</Badge>
+                                  </div>
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              );
-            })}
-            {!!unassignedStories.length && (
-              <div className="space-y-3">
-                <p className="text-xs font-semibold text-warning uppercase tracking-wider">Unassigned</p>
-                {unassignedStories.map((s) => (
-                  <Card key={s.id} className="shadow-soft border-border/60">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-warning/15 text-warning">{s.storyId}</span>
-                        {s.title}
-                      </CardTitle>
-                    </CardHeader>
-                  </Card>
-                ))}
+                              </summary>
+
+                              <div className="px-4 pb-4 space-y-4 border-t border-border/60">
+                                {/* User story narrative */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-4">
+                                  <div className="p-3 rounded-lg bg-accent/40 border border-border">
+                                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">As a</p>
+                                    <p className="text-sm text-foreground">{s.asA}</p>
+                                  </div>
+                                  <div className="p-3 rounded-lg bg-accent/40 border border-border">
+                                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">I want to</p>
+                                    <p className="text-sm text-foreground">{s.iWant}</p>
+                                  </div>
+                                  <div className="p-3 rounded-lg bg-accent/40 border border-border">
+                                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-1">So that</p>
+                                    <p className="text-sm text-foreground">{s.soThat}</p>
+                                  </div>
+                                </div>
+
+                                {/* Acceptance Criteria collapsible */}
+                                <details open className="rounded-lg border border-border bg-card overflow-hidden group/ac">
+                                  <summary className="cursor-pointer list-none px-3 py-2 flex items-center gap-2 bg-muted/40 hover:bg-muted transition">
+                                    <span className="text-primary text-[10px] transition-transform group-open/ac:rotate-90">▶</span>
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                      Acceptance Criteria (Gherkin)
+                                    </span>
+                                    <Badge variant="secondary" className="ml-auto text-[10px]">{acRows.filter(r => r.gherkin).length} scenarios</Badge>
+                                  </summary>
+                                  <div className="p-3 space-y-3">
+                                    {acRows.map((r) => (
+                                      <div key={r.label}>
+                                        <p className="text-[11px] font-semibold text-primary mb-1 flex items-center gap-2">
+                                          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-primary/10">{r.id}</span>
+                                          {r.label}
+                                        </p>
+                                        <pre className="text-xs bg-foreground/95 text-background p-3 rounded-lg overflow-x-auto font-mono leading-relaxed whitespace-pre-wrap">
+{r.gherkin || "—"}
+                                        </pre>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </details>
+
+                                {/* Metadata grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                                  <div className="p-2.5 rounded-md border border-border bg-card">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Story Points</p>
+                                    <p className="text-sm font-semibold text-foreground mt-0.5">{s.complexityPoints}</p>
+                                  </div>
+                                  <div className="p-2.5 rounded-md border border-border bg-card">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Complexity</p>
+                                    <p className="text-sm font-semibold text-foreground mt-0.5">{fr.complexity}</p>
+                                  </div>
+                                  <div className="p-2.5 rounded-md border border-border bg-card">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Business Value</p>
+                                    <p className="text-sm text-foreground mt-0.5">{s.businessValue || fr.businessValue || "—"}</p>
+                                  </div>
+                                  <div className="p-2.5 rounded-md border border-border bg-card md:col-span-1">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Dependencies</p>
+                                    <p className="text-sm text-foreground mt-0.5">{fr.dependencies?.length ? fr.dependencies.join(", ") : "—"}</p>
+                                  </div>
+                                  <div className="p-2.5 rounded-md border border-border bg-card">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Related Risks</p>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {storyRisks.length ? storyRisks.map((r) => (
+                                        <Badge key={r.id} variant="outline" className="font-mono text-[10px] border-destructive/30 text-destructive">
+                                          {r.riskId ?? r.id}
+                                        </Badge>
+                                      )) : <span className="text-xs text-muted-foreground">—</span>}
+                                    </div>
+                                  </div>
+                                  <div className="p-2.5 rounded-md border border-border bg-card">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Related Stakeholders</p>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {frStakeholders.length ? frStakeholders.map((name, i) => (
+                                        <Badge key={i} variant="secondary" className="text-[10px]">{name}</Badge>
+                                      )) : <span className="text-xs text-muted-foreground">—</span>}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Traceability footer */}
+                                <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border/60 text-[11px]">
+                                  <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Traceability:</span>
+                                  <span className="font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">{decomp.businessRequirement.id}</span>
+                                  <span className="text-muted-foreground">→</span>
+                                  <span className="font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">{fr.id}</span>
+                                  <span className="text-muted-foreground">→</span>
+                                  <span className="font-mono px-1.5 py-0.5 rounded bg-primary text-primary-foreground">{s.storyId}</span>
+                                  <span className="text-muted-foreground">→</span>
+                                  <span className="font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">AC-{s.storyId}-*</span>
+                                  {storyRisks.length > 0 && (
+                                    <>
+                                      <span className="text-muted-foreground">→</span>
+                                      <span className="font-mono px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                                        {storyRisks.map(r => r.riskId ?? r.id).join(", ")}
+                                      </span>
+                                    </>
+                                  )}
+                                  <Button asChild size="sm" variant="ghost" className="ml-auto h-6 px-2 text-[11px]">
+                                    <button type="button" onClick={() => setTab("rtm")}>View in RTM →</button>
+                                  </Button>
+                                </div>
+                              </div>
+                            </details>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  );
+                })}
+
+                {!!unassignedStories.length && (
+                  <details className="rounded-lg border border-warning/40 bg-warning/5 overflow-hidden">
+                    <summary className="cursor-pointer list-none p-3 flex items-center gap-2 text-sm">
+                      <span className="text-warning text-[10px]">▶</span>
+                      <span className="font-semibold text-warning">Unassigned Stories</span>
+                      <Badge variant="outline" className="ml-auto text-warning border-warning/40">{unassignedStories.length}</Badge>
+                    </summary>
+                    <div className="p-3 space-y-2">
+                      {unassignedStories.map((s) => (
+                        <div key={s.id} className="flex items-center gap-2 text-sm">
+                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-warning/15 text-warning">{s.storyId}</span>
+                          <span>{s.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </div>
-            )}
+            </details>
           </TabsContent>
 
           <TabsContent value="people" className="mt-4">
